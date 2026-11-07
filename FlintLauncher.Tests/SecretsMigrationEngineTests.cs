@@ -114,8 +114,6 @@ public class MigrationEngineTests : IDisposable
         var legacy = engine.Find("flint-legacy");
         Assert.NotNull(prism);
         Assert.NotNull(legacy);
-        Assert.False(prism.AutoRunAtStartup);        // API-driven
-        Assert.True(legacy.AutoRunAtStartup);        // startup probe runs once
         Assert.NotNull(engine.Find("FLINT-LEGACY")); // lookup is case-insensitive
         Assert.Null(engine.Find("unknown"));
     }
@@ -227,8 +225,6 @@ public class MigrationEngineTests : IDisposable
         var candidates = legacy.Detect(paths, decisions);
         var hit = Assert.Single(candidates);
         Assert.False(hit.DecisionRecorded);
-        // the auto-run predicate lights up for the undecided detection
-        Assert.Equal([legacy], engine.AutoRunCandidates(paths, decisions));
 
         // the decision record settles it — the engine never proposes twice
         decisions.Write(new MigrationDecisionRecord
@@ -238,7 +234,6 @@ public class MigrationEngineTests : IDisposable
             At = DateTimeOffset.Now.ToString("o"),
         });
         Assert.True(legacy.Detect(paths, decisions).Single().DecisionRecorded);
-        Assert.Empty(engine.AutoRunCandidates(paths, decisions));
 
         // the flat→five-root whitelist mapping: flint.cfg plans onto the config root
         var plan = legacy.Plan(data, paths, ImportMode.Move);

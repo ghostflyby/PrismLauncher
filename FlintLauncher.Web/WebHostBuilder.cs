@@ -115,19 +115,17 @@ public static class WebHostBuilder
         // ------------------------------------------------------------------ core assembly
         // The singletons a C++ Application object would own, built once against the resolved
         // roots. The order IS the dependency graph: platform clients over the shared
-        // transport → the watch tenancy and its lock → secrets → state (loaded before the
-        // config import, which sorts state keys into it) → the flint-legacy remount (eager,
-        // once — before the config import so a moved flint.cfg is found, and before the cache
-        // ledger so its Load reads the remounted ledger) → config + INI import → dir settings
-        // → cache ledger → instances → icons/skins → accounts.
+        // transport → the watch tenancy and its lock → secrets → state → the migration
+        // decision store → config → dir settings → cache ledger → instances → icons/skins →
+        // accounts. NOTHING here migrates: every migration (the flint-legacy remount, the
+        // INI config projection, the instance.cfg conversion) is a user-triggered operation
+        // behind the migration endpoints — the host boots on whatever layout it finds.
         InstanceMutationLock instanceLock;
         DirectorySpace watchSpace;
         ISecretStore secrets;
         LauncherStateStore state;
         MigrationDecisionStore migrationDecisions;
-        FlintLegacyMigration.Result legacyMigration;
         FlintConfigStore config;
-        FlintConfigImporter.ImportResult configImport;
         ConfiguredDirs dirs;
         HttpMetaCache metaCache;
         InstanceList instances;
@@ -174,24 +172,17 @@ public static class WebHostBuilder
             // ModrinthToken, FlameKeyOverride) reads and writes here
             secrets = new FileSecretStore(paths.SecretsFile, FlintJsonContext.Default.SecretsFile);
 
-            // state load: launcher-state.json BEFORE the config import — the importer strips
-            // the state keys into it
+            // state load: launcher-state.json (the migration projection writes state keys
+            // into it when the user triggers it)
             state = new LauncherStateStore(paths.LauncherStateFile, FlintJsonContext.Default.LauncherState);
 
             // per-source migration decision records: <state>/migration/<source>.json
             migrationDecisions = new MigrationDecisionStore(
                 paths.MigrationDir, FlintJsonContext.Default.MigrationDecisionRecord);
 
-            // the pre-reform flat layout remounts onto the five roots exactly once (eager,
-            // no lazy dual-read), before the config import and the cache ledger
-            legacyMigration = FlintLegacyMigration.ExecuteIfNeeded(paths, migrationDecisions);
-
-            // flint.json is the authoritative user layer; when it is missing, the one-shot
-            // importer reads the INI chain (flint.cfg ← prismlauncher.cfg ← polymc.cfg ←
-            // multimc.cfg|mmc.cfg) and sorts it in a single pass: secret trio → the store,
-            // state keys → the state store, the rest → the record domains
+            // flint.json is the authoritative user layer; a legacy INI chain lands on it
+            // through the manual migration (FlintMigration), never at startup
             config = new FlintConfigStore(paths.ConfigFile, FlintJsonContext.Default.FlintConfigFile);
-            configImport = FlintConfigImporter.ImportIfNeeded(paths, config, secrets, state);
             dirs = new ConfiguredDirs(paths, config.Monitor);
 
             // the standard base table, registered exactly once before any use, then the
@@ -370,38 +361,6 @@ public static class WebHostBuilder
         // resolve the launch factory eagerly — its construction is the last piece of the
         // composition, and failing here beats failing at the first launch request
         _ = app.Services.GetRequiredService<LaunchFactory>();
-
-        // the flint-legacy startup remount ran during assembly — surface what it did
-        // (informational; a failed pass retries next start)
-        if (legacyMigration is { Ran: true } legacy)
-        {
-            loggerFactory.CreateLogger(LogCategories.Migration).LogInformation(
-                "flint-legacy remount: {Items} item(s), {Bytes} bytes, legacy Prism ledger cleaned: {Cleaned}{Suffix}",
-                legacy.ItemsMoved, legacy.Bytes, legacy.LegacyLedgerCleaned,
-                legacy.Error is null ? "" : $" (incomplete, will resume: {legacy.Error})");
-        }
-        else
-        {
-            // silent skips cost a real-machine diagnosis once already: say why, at Debug
-            // (a fresh install skips on every startup — Information would be spam)
-            loggerFactory.CreateLogger(LogCategories.Migration).LogDebug(
-                "flint-legacy remount: skipped (no undecided legacy layout at the data or home root)");
-        }
-
-        // the INI import ran during assembly too — surface its outcome, in particular the
-        // previously SILENT failure: a chain INI that exists but cannot be parsed (the
-        // launcher starts on a default flint.json behind it)
-        if (configImport.ImportedIni is { } importedIni)
-        {
-            loggerFactory.CreateLogger(LogCategories.Startup).LogInformation(
-                "INI import: flint.json seeded from {Ini}", importedIni);
-        }
-        else if (configImport.UnreadableIni is { } unreadableIni)
-        {
-            loggerFactory.CreateLogger(LogCategories.Startup).LogWarning(
-                "INI import: {Ini} is unreadable — flint.json stays default (the INI is kept; the write side is JSON-only)",
-                unreadableIni);
-        }
 
         // request log, outermost so the status is final (the error middleware below may
         // rewrite it to 500); health probes log at Debug to keep the default view readable

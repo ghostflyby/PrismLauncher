@@ -38,6 +38,8 @@ public class InstanceCopyTests : IDisposable
             "name=Source",
             "totalTimePlayed=1234",
         ]);
+        // the migration pass a Prism-format source goes through before the list sees it
+        TestLegacyConversion.Convert(new AbsolutePath(_instancesDir));
 
         // game root content (default "minecraft" layout)
         var gameRoot = Path.Combine(_sourceDir, "minecraft");

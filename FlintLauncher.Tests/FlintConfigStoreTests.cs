@@ -223,7 +223,7 @@ public class FlintConfigStoreTests : IDisposable
 
         var store = NewStore();
         var (secrets, state) = NewSideStores();
-        var imported = FlintConfigImporter.ImportIfNeeded(paths, store, secrets, state);
+        var imported = FlintConfigImporter.Import(paths, store, secrets, state);
 
         // the chain file that won + the one-shot seal
         Assert.EndsWith("prismlauncher.cfg", imported.ImportedIni);
@@ -280,30 +280,58 @@ public class FlintConfigStoreTests : IDisposable
 
         var store = NewStore();
         var (secrets, state) = NewSideStores();
-        var imported = FlintConfigImporter.ImportIfNeeded(paths, store, secrets, state);
+        var imported = FlintConfigImporter.Import(paths, store, secrets, state);
         Assert.EndsWith("flint.cfg", imported.ImportedIni);
         Assert.Equal("from-flint", store.Current.Language.Language);
     }
 
     [Fact]
-    public void Import_Is_One_Shot_On_The_FlintJson_Guard()
+    public void Import_Merges_Idempotently_And_Never_Downgrades_Written_Values()
     {
         var paths = Paths;
         paths.DataRoot.CreateDirectory();
         (paths.DataRoot / "flint.cfg").WriteAllText(
-            "[General]\nMaxMemAlloc=4096\nProxyPass=first\n");
+            "[General]\nMinMemAlloc=256\nProxyPass=first\n");
         var store = NewStore();
         var (secrets, state) = NewSideStores();
 
-        Assert.NotNull(FlintConfigImporter.ImportIfNeeded(paths, store, secrets, state).ImportedIni);
-        Assert.Equal(4096, store.Current.Memory.MaxMemAlloc);
+        Assert.NotNull(FlintConfigImporter.Import(paths, store, secrets, state).ImportedIni);
+        Assert.Equal(256, store.Current.Memory.MinMemAlloc);
 
-        // a later INI change must not win: flint.json now exists and is authoritative
+        // the merge rule: a member the user's INI already set (≠ its record default) is
+        // customized — a later INI change lands nowhere, and a stored secret is never
+        // overwritten (a value that coincidentally EQUALS the default is the heuristic's
+        // known blind spot: only MaxMemAlloc is machine-derived, the rest are fixed)
         (paths.DataRoot / "flint.cfg").WriteAllText(
-            "[General]\nMaxMemAlloc=1111\nProxyPass=second\n");
-        Assert.Null(FlintConfigImporter.ImportIfNeeded(paths, store, secrets, state).ImportedIni);
-        Assert.Equal(4096, store.Current.Memory.MaxMemAlloc);
+            "[General]\nMinMemAlloc=999\nProxyPass=second\n");
+        Assert.NotNull(FlintConfigImporter.Import(paths, store, secrets, state).ImportedIni);
+        Assert.Equal(256, store.Current.Memory.MinMemAlloc);
         Assert.Equal("first", secrets.Get("ProxyPass"));
+
+        // the projection fills members still at default: an INI key the first pass missed
+        (paths.DataRoot / "flint.cfg").WriteAllText(
+            "[General]\nMinMemAlloc=999\nProxyPass=second\nRequestTimeout=90\n");
+        FlintConfigImporter.Import(paths, store, secrets, state);
+        Assert.Equal(256, store.Current.Memory.MinMemAlloc);
+        Assert.Equal(90, store.Current.Launcher.RequestTimeout);
+    }
+
+    [Fact]
+    public void Import_Merges_Over_An_Existing_FlintJson()
+    {
+        var paths = Paths;
+        paths.DataRoot.CreateDirectory();
+        (paths.DataRoot / "flint.cfg").WriteAllText("[General]\nMinMemAlloc=999\nProxyAddr=proxy.corp\n");
+        var store = NewStore();
+        var (secrets, state) = NewSideStores();
+
+        // the user wrote a setting before running the migration: the customized value wins,
+        // the member still at default that the INI carries is filled
+        store.Set("MinMemAlloc", 256);
+        var imported = FlintConfigImporter.Import(paths, store, secrets, state);
+        Assert.EndsWith("flint.cfg", imported.ImportedIni);
+        Assert.Equal(256, store.Current.Memory.MinMemAlloc);
+        Assert.Equal("proxy.corp", store.Current.Proxy.ProxyAddr);
     }
 
     [Fact]
@@ -323,7 +351,7 @@ public class FlintConfigStoreTests : IDisposable
         var store = NewStore();
         var (secrets, state) = NewSideStores();
 
-        Assert.NotNull(FlintConfigImporter.ImportIfNeeded(paths, store, secrets, state).ImportedIni);
+        Assert.NotNull(FlintConfigImporter.Import(paths, store, secrets, state).ImportedIni);
         // the quintet is state-side and path-keyed now — nothing importable without the path
         Assert.Empty(state.Current.Java.Detections);
         Assert.Equal("", state.Current.Java.LastHostname);
@@ -349,7 +377,7 @@ public class FlintConfigStoreTests : IDisposable
         var store = NewStore();
         var (secrets, state) = NewSideStores();
 
-        Assert.NotNull(FlintConfigImporter.ImportIfNeeded(paths, store, secrets, state).ImportedIni);
+        Assert.NotNull(FlintConfigImporter.Import(paths, store, secrets, state).ImportedIni);
         Assert.Equal(999, state.Current.Playtime.Total);
         Assert.True(state.Current.Playtime.Migrated);
         Assert.True(state.Current.UserAskedAboutAutomaticJavaDownload);
@@ -425,7 +453,7 @@ public class FlintConfigStoreTests : IDisposable
         var store = NewStore();
         var (secrets, state) = NewSideStores();
 
-        Assert.NotNull(FlintConfigImporter.ImportIfNeeded(paths, store, secrets, state).ImportedIni);
+        Assert.NotNull(FlintConfigImporter.Import(paths, store, secrets, state).ImportedIni);
 
         Assert.True(store.Current.Window.LaunchMaximized);
         Assert.Equal(1024, store.Current.Window.MinecraftWinWidth);
@@ -465,7 +493,7 @@ public class FlintConfigStoreTests : IDisposable
         var store = NewStore();
         var (secrets, state) = NewSideStores();
 
-        Assert.NotNull(FlintConfigImporter.ImportIfNeeded(paths, store, secrets, state).ImportedIni);
+        Assert.NotNull(FlintConfigImporter.Import(paths, store, secrets, state).ImportedIni);
 
         // INISettingsObject::retrieveValue walks configKeys() primary-first: the alias line
         // drops when the primary spelling is present, regardless of file order
@@ -493,7 +521,7 @@ public class FlintConfigStoreTests : IDisposable
         var store = NewStore();
         var (secrets, state) = NewSideStores();
 
-        Assert.NotNull(FlintConfigImporter.ImportIfNeeded(paths, store, secrets, state).ImportedIni);
+        Assert.NotNull(FlintConfigImporter.Import(paths, store, secrets, state).ImportedIni);
         Assert.Equal(654321, state.Current.Playtime.Total);
         Assert.True(state.Current.Playtime.Migrated);
         // the ordinary chain keys landed as usual (the probe rides the same one-shot)
@@ -517,7 +545,7 @@ public class FlintConfigStoreTests : IDisposable
         var store = NewStore();
         var (secrets, state) = NewSideStores();
 
-        Assert.NotNull(FlintConfigImporter.ImportIfNeeded(paths, store, secrets, state).ImportedIni);
+        Assert.NotNull(FlintConfigImporter.Import(paths, store, secrets, state).ImportedIni);
         Assert.Equal(222, state.Current.Playtime.Total); // the file outranks the chain
         Assert.True(state.Current.Playtime.Migrated);    // the chain fills the absent member
     }
@@ -538,7 +566,7 @@ public class FlintConfigStoreTests : IDisposable
         var store = NewStore();
         var (secrets, state) = NewSideStores();
 
-        Assert.NotNull(FlintConfigImporter.ImportIfNeeded(paths, store, secrets, state).ImportedIni);
+        Assert.NotNull(FlintConfigImporter.Import(paths, store, secrets, state).ImportedIni);
         Assert.False(store.Current.Java.AutomaticJavaSwitch);
         Assert.False(store.Current.Java.AutomaticJavaDownload);
         // the derived pair materialized into flint.json (the one-shot seal), from where the
@@ -561,7 +589,7 @@ public class FlintConfigStoreTests : IDisposable
         var store = NewStore();
         var (secrets, state) = NewSideStores();
 
-        Assert.NotNull(FlintConfigImporter.ImportIfNeeded(paths, store, secrets, state).ImportedIni);
+        Assert.NotNull(FlintConfigImporter.Import(paths, store, secrets, state).ImportedIni);
         Assert.True(store.Current.Java.AutomaticJavaSwitch);    // explicit — untouched
         Assert.False(store.Current.Java.AutomaticJavaDownload); // derived from the pin
     }
@@ -576,26 +604,29 @@ public class FlintConfigStoreTests : IDisposable
         var store = NewStore();
         var (secrets, state) = NewSideStores();
 
-        Assert.NotNull(FlintConfigImporter.ImportIfNeeded(paths, store, secrets, state).ImportedIni);
+        Assert.NotNull(FlintConfigImporter.Import(paths, store, secrets, state).ImportedIni);
         Assert.True(store.Current.Java.AutomaticJavaSwitch);
         Assert.True(store.Current.Java.AutomaticJavaDownload);
     }
 
     [Fact]
-    public void Import_Reports_The_Guarded_One_Shot_As_Idle_Not_Failed()
+    public void Import_Is_Idle_Only_Without_A_Chain_File()
     {
-        // flint.json exists → the one-shot guard: Idle (neither imported nor unreadable) —
-        // the host logs Idle as silence, a failure only when UnreadableIni is set
+        // no chain file at any root → Idle (neither imported nor unreadable); the projection
+        // itself has no guard — a chain file always reports, it just fills nothing on a
+        // re-run
         var paths = Paths;
         paths.DataRoot.CreateDirectory();
-        (paths.DataRoot / "flint.cfg").WriteAllText("[General]\nLanguage=x\n");
         var store = NewStore();
         var (secrets, state) = NewSideStores();
-        Assert.NotNull(FlintConfigImporter.ImportIfNeeded(paths, store, secrets, state).ImportedIni);
+        var idle = FlintConfigImporter.Import(paths, store, secrets, state);
+        Assert.Null(idle.ImportedIni);
+        Assert.Null(idle.UnreadableIni);
+        Assert.False(store.FilePath.ExistsFile());
 
-        var guarded = FlintConfigImporter.ImportIfNeeded(paths, store, secrets, state);
-        Assert.Null(guarded.ImportedIni);
-        Assert.Null(guarded.UnreadableIni);
+        (paths.DataRoot / "flint.cfg").WriteAllText("[General]\nLanguage=x\n");
+        Assert.NotNull(FlintConfigImporter.Import(paths, store, secrets, state).ImportedIni);
+        Assert.NotNull(FlintConfigImporter.Import(paths, store, secrets, state).ImportedIni);
     }
 }
 

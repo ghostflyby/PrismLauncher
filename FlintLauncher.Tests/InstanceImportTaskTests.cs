@@ -113,19 +113,36 @@ public class InstanceImportTaskTests : IDisposable
         var packDir = Path.Combine(dir, "MyModpack");
         Directory.CreateDirectory(Path.Combine(packDir, ".minecraft"));
         await File.WriteAllTextAsync(Path.Combine(packDir, "instance.cfg"),
-            "InstanceType=OneSix\nname=Original Name\niconKey=default\n");
+            """
+            InstanceType=OneSix
+            name=Original Name
+            iconKey=custom-pack-icon
+            notes=pack notes
+            OverrideMemory=true
+            MaxMemAlloc=2048
+            """);
         await File.WriteAllTextAsync(Path.Combine(packDir, ".minecraft", "options.txt"), "keepMe=1\n");
         Assert.True(MmcZip.CompressDir(new AbsolutePath(zipPath), new AbsolutePath(packDir)));
 
         await RunImport(new Uri(zipPath));
 
         // the extracted pack folder landed in the staging instance dir and was renamed; the
-        // import fixups run through the typed adapter — instance.json
+        // staging conversion carried the cfg payload into instance.json and the import
+        // fixups (fresh uuid, new name, playtime reset) wrote over it
         var instanceDir = Path.Combine(_root, "instances", "Imported");
         Assert.True(Directory.Exists(instanceDir));
-        var cfg = await File.ReadAllTextAsync(Path.Combine(instanceDir, "instance.json"));
-        Assert.Contains("Imported", cfg);
+        var json = await File.ReadAllTextAsync(Path.Combine(instanceDir, "instance.json"));
+        Assert.Contains("Imported", json);
+        // the pack's payload survived the conversion (icon — no user override —, notes, and
+        // the gate-true memory override)
+        Assert.Contains("custom-pack-icon", json);
+        Assert.Contains("pack notes", json);
+        Assert.Contains("2048", json);
+        Assert.DoesNotContain("Original Name", json);
         Assert.True(File.Exists(Path.Combine(instanceDir, ".minecraft", "options.txt")));
+        // the cfg itself rides along untouched
+        Assert.Contains("custom-pack-icon",
+            await File.ReadAllTextAsync(Path.Combine(instanceDir, "instance.cfg")));
     }
 
     [Fact]

@@ -40,6 +40,7 @@ public class ModelNotificationTests : IDisposable
     {
         var dir = MaterializedDirectory.Ensure(instancesDir / id)!;
         (dir.Path / "instance.cfg").WriteAllLines(["InstanceType=OneSix", "name=" + name]);
+        TestLegacyConversion.Convert(instancesDir);
     }
 
     private InstanceList CreateList() =>

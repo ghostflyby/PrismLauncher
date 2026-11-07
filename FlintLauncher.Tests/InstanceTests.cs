@@ -255,7 +255,7 @@ public class InstanceTests : IDisposable
     }
 
     [Fact]
-    public void PrismFormat_CfgIsReadOnlyUntilFirstWrite()
+    public void Legacy_Cfg_Converts_Eagerly_The_Cfg_Stays_Unwritten()
     {
         // a Prism-format instance directory (instance.cfg, no instance.json)
         File.WriteAllLines(_cfgPath,
@@ -273,8 +273,14 @@ public class InstanceTests : IDisposable
             "lastTimePlayed=120",
         ]);
 
+        // the migration pass materializes BOTH halves before the store reads anything (the
+        // trio's seed lands in instance-state.json, the gate-folded payload in instance.json)
+        TestLegacyConversion.ConvertOne(new AbsolutePath(_root));
+        Assert.True(File.Exists(JsonPath));
+        Assert.True(File.Exists(StatePath));
+
         var instance = new MinecraftInstance(Settings(), new AbsolutePath(_root));
-        // reads come from the in-memory cfg import (gate honored: gate=true keeps the value)
+        // reads come from the converted layer (gate honored: gate=true keeps the value)
         Assert.Equal("Prism Inst", instance.Name());
         Assert.Equal("grass", instance.IconKey());
         Assert.Equal("0123456789abcdef0123456789abcdef", instance.Uuid);
@@ -282,20 +288,11 @@ public class InstanceTests : IDisposable
         Assert.True(Variant.AsBool(instance.Settings.Get("OverrideMemory")));
         Assert.Equal(1700000000000, instance.LastLaunch());
         Assert.Equal(3600, instance.TotalTimePlayed());
-        // read-only: neither the config nor the state was materialized by the load
-        Assert.False(File.Exists(JsonPath));
-        Assert.False(File.Exists(StatePath));
-
-        // the FIRST WRITE converts: the imported payload (uuid verbatim) becomes instance.json
-        instance.SetNotes("converted");
-        Assert.True(File.Exists(JsonPath));
-        Assert.True(File.Exists(StatePath)); // the trio moved to the state file on first write
-        var converted = File.ReadAllText(JsonPath);
-        Assert.Contains("converted", converted);
-        Assert.Contains("0123456789abcdef0123456789abcdef", converted); // uuid survives
-        // the cfg is never rewritten or deleted (read-compat), but instance.json now wins
+        // the cfg is never rewritten or deleted (read-compat), but instance.json wins
         Assert.Contains("name=Prism Inst", File.ReadAllText(_cfgPath));
 
+        instance.SetNotes("converted");
+        Assert.Contains("converted", File.ReadAllText(JsonPath));
         var reloaded = new MinecraftInstance(Settings(), new AbsolutePath(_root));
         Assert.Equal("converted", reloaded.Notes());
         Assert.Equal("0123456789abcdef0123456789abcdef", reloaded.Uuid);
@@ -315,6 +312,7 @@ public class InstanceTests : IDisposable
             "MaxMemAlloc=2048",
         ]);
 
+        TestLegacyConversion.ConvertOne(new AbsolutePath(_root));
         var instance = new MinecraftInstance(Settings(), new AbsolutePath(_root));
         Assert.False(Variant.AsBool(instance.Settings.Get("OverrideMemory")));
         Assert.Equal(4096, Variant.AsInt(instance.Settings.Get("MaxMemAlloc"))); // user layer
@@ -335,6 +333,7 @@ public class InstanceTests : IDisposable
             "MaxMemAlloc=2048",
         ]);
 
+        TestLegacyConversion.ConvertOne(new AbsolutePath(_root));
         var instance = new MinecraftInstance(Settings(), new AbsolutePath(_root));
         Assert.True(Variant.AsBool(instance.Settings.Get("OverrideMemory")));
         Assert.Equal(2048, Variant.AsInt(instance.Settings.Get("MaxMemAlloc"))); // kept, not the user layer's 4096
@@ -361,6 +360,7 @@ public class InstanceTests : IDisposable
             "OverrideMemory=true",
         ]);
 
+        TestLegacyConversion.ConvertOne(new AbsolutePath(_root));
         var instance = new MinecraftInstance(Settings(), new AbsolutePath(_root));
         Assert.Equal("/opt/jdk-21/bin/java", Variant.AsString(instance.Settings.Get("JavaPath")));
         Assert.Equal("-Xss1m", Variant.AsString(instance.Settings.Get("JvmArgs")));
@@ -385,6 +385,7 @@ public class InstanceTests : IDisposable
             "OverrideMemory=false",
         ]);
 
+        TestLegacyConversion.ConvertOne(new AbsolutePath(_root));
         var instance = new MinecraftInstance(Settings(), new AbsolutePath(_root));
         Assert.False(Variant.AsBool(instance.Settings.Get("OverrideMemory")));
         // the orphaned value was dropped (gate=false), the seeded user-layer default applies
@@ -403,6 +404,7 @@ public class InstanceTests : IDisposable
             "MaxMemAlloc=8192",
         ]);
 
+        TestLegacyConversion.ConvertOne(new AbsolutePath(_root));
         var instance = new MinecraftInstance(Settings(), new AbsolutePath(_root));
         Assert.False(Variant.AsBool(instance.Settings.Get("OverrideMemory")));
         Assert.Equal(4096, Variant.AsInt(instance.Settings.Get("MaxMemAlloc"))); // user layer

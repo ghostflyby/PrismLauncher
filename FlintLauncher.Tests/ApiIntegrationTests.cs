@@ -554,6 +554,8 @@ public class FlintApiIntegrationTests
             LaunchFixture.DefaultPatchJson);
         await File.WriteAllTextAsync(Path.Combine(instanceRoot, "mmc-pack.json"),
             """{"formatVersion":1,"components":[{"important":true,"uid":"net.minecraft"}]}""");
+        // the migration pass a cfg-only directory goes through before the host lists it
+        TestLegacyConversion.ConvertOne(new AbsolutePath(instanceRoot));
 
         var root = Path.Combine(dataDir, "scratch");
         Directory.CreateDirectory(root);

@@ -216,8 +216,10 @@ public class InstanceList : INotifyCollectionChanged, INotifyPropertyChanged, IR
 
     public AbsolutePath PrimaryDir() => _instDirs.FirstOrDefault();
 
-    /// <summary>Port of InstanceList::instanceDirs (all configured instance roots).</summary>
-    public IReadOnlyList<AbsolutePath> InstanceDirs => _instDirs;
+    /// <summary>Port of InstanceList::instanceDirs (all configured instance roots). A
+    /// snapshot: the live list mutates under the instance lock (SetInstanceDirs), and
+    /// readers outside it must never enumerate a list that can be replaced mid-walk.</summary>
+    public IReadOnlyList<AbsolutePath> InstanceDirs => [.. _instDirs];
 
     /// <summary>C++ m_instances (in list order).</summary>
     public IReadOnlyList<BaseInstance> Instances => _instances;
@@ -937,11 +939,11 @@ public class InstanceList : INotifyCollectionChanged, INotifyPropertyChanged, IR
             foreach (var entry in rootInfo.EnumerateDirectories("*", options))
             {
                 var instDir = new AbsolutePath(entry.FullName);
-                // dual-track discovery: a Flint-format directory carries instance.json,
-                // a Prism-format one instance.cfg — both are instances (the cfg stays
-                // read-only until the instance's first write converts it)
-                if (!(instDir / "instance.json").ExistsFile() &&
-                    !(instDir / "instance.cfg").ExistsFile())
+                // an instance directory carries instance.json; a directory that still
+                // carries only the Prism-era instance.cfg is migration material
+                // (LegacyInstanceConversion materializes instance.json from it) and stays
+                // invisible until that manual pass converts it
+                if (!(instDir / "instance.json").ExistsFile())
                 {
                     continue;
                 }
@@ -990,8 +992,8 @@ public class InstanceList : INotifyCollectionChanged, INotifyPropertyChanged, IR
         var environment = Environment;
 
         var instanceRoot = RootDirOf(id) / id;
-        // the typed layer stack: instance.json when present (Flint format), otherwise
-        // the read-only instance.cfg import in memory — no write happens on discovery
+        // the typed layer stack over instance.json (discovery only lists converted
+        // directories — the legacy conversion pass materialized the file)
         var instanceSettings = new InstanceJsonSettingsObject(instanceRoot, environment);
         // register the discriminator before dispatch (BaseInstance would only register it
         // inside the ctor, which the dispatch below decides)
@@ -1040,9 +1042,9 @@ public class InstanceList : INotifyCollectionChanged, INotifyPropertyChanged, IR
     // this type keeps only the location anchors above and the uuid conversion delegate.)
 
     /// <summary>The uuid of a just-committed instance folder, read straight from its
-    /// metadata (instance.json identity.uuid first, else the imported instance.cfg uuid
-    /// key — the same precedence discovery uses). Empty = unresolvable: the group member
-    /// is then written under the raw dirname and converted at the next group load.</summary>
+    /// metadata (instance.json identity.uuid). Empty = unresolvable: the group member is
+    /// then written under the raw dirname and retried at the next group load (a cfg-only
+    /// directory resolves only after the manual migration converted it).</summary>
     private static string ProbeInstanceUuid(AbsolutePath instanceRoot)
     {
         try
@@ -1059,15 +1061,6 @@ public class InstanceList : INotifyCollectionChanged, INotifyPropertyChanged, IR
                 {
                     return uuid.GetString() ?? "";
                 }
-
-                return "";
-            }
-
-            var cfgPath = instanceRoot / InstanceIniImporter.LegacyFileName;
-            if (cfgPath.ExistsFile())
-            {
-                var ini = new IniFile();
-                return ini.LoadFile(cfgPath) ? ini.GetString("uuid", "") : "";
             }
         }
         catch (Exception e) when (e is JsonException or IOException or UnauthorizedAccessException)

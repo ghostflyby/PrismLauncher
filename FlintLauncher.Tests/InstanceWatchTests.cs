@@ -44,6 +44,7 @@ public class InstanceWatchTests : IDisposable
     {
         var dir = MaterializedDirectory.Ensure(instancesDir / id)!;
         (dir.Path / "instance.cfg").WriteAllLines(["InstanceType=OneSix", "name=" + name]);
+        TestLegacyConversion.Convert(instancesDir);
     }
 
     [Fact]

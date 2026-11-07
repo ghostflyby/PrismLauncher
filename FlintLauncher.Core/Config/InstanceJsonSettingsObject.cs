@@ -3,14 +3,14 @@
 //
 // The instance settings object over the typed layer stack (the
 // SettingsObject shape the instance/launch layer reads through, backed by
-// flint.json -> instance.json instead of instance.cfg):
+// flint.json -> instance.json):
 //
 //  - READS resolve through the fold per key (InstanceConfigKeys): instance-layer member
 //    when set, else the user layer (the live flint.json snapshot), else the registered
 //    Setting default (the instance-only keys' defaults).
-//  - WRITES land in the instance layer only and persist instance.json atomically; on a
-//    Prism-format instance the first write performs the dual-track conversion (the in-memory
-//    instance.cfg import materializes as instance.json — see InstanceConfigStore).
+//  - WRITES land in the instance layer only and persist instance.json atomically (the
+//    directory is Flint format already — the manual migration converted any instance.cfg
+//    before discovery listed the instance).
 //  - The runtime time trio (lastLaunchTime/lastTimePlayed/totalTimePlayed) routes to
 //    instance-state.json, never to the config.
 //  - The Override* gates are DERIVED: reading computes "any family member set"; writing
@@ -59,9 +59,7 @@ public sealed class InstanceJsonSettingsObject(AbsolutePath instanceRoot, Instan
                 break;
             default:
                 ConfigStore.Update(current => Apply(setting.Id, current, value));
-                // the dual-track conversion is whole-instance: once the config side turned
-                // Flint format, the trio's home materializes too (the legacy cfg seed must
-                // not keep feeding runtime values)
+                // the trio's home lands beside the config on the first write of any kind
                 StateStore.EnsureMaterialized();
                 break;
         }

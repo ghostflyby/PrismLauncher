@@ -1,16 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
-//
-// Migration endpoints: detect Prism-family data directories, plan the import, run it as a
-// background task (move / CoW-clone / copy), and record declined sources (decision
-// records under the state root). The prism-family endpoints are strictly user-triggered —
-// prism-family never auto-runs; the flint-legacy profile is the one startup eager pass
-// (composed by WebHostBuilder, which logs its outcome) and is not served here.
 
 using System.Security;
 using FlintLauncher.Core;
+using FlintLauncher.Core.Config;
+using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Migration;
+using FlintLauncher.Core.Secrets;
+using FlintLauncher.Core.State;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.Services;
 using TruePath;
@@ -37,6 +35,14 @@ public sealed record PrismImportPlanResponse(
     long TotalFiles,
     long TotalBytes,
     PrismImportPlanItem[] Items);
+
+/// <summary>GET /migration/flint/candidates response.</summary>
+public sealed record FlintMigrationCandidatesResponse(
+    string? LegacyRoot,
+    bool RemountDecided,
+    string? IniChainFile,
+    int PendingInstances,
+    bool Any);
 
 public static class MigrationEndpoints
 {
@@ -174,6 +180,53 @@ public static class MigrationEndpoints
 
             return Results.NoContent();
         }).Produces(204);
+
+        // ---- the flint side: one manual run over this install's own legacy material -------
+        var flint = api.MapGroup("/migration/flint");
+
+        flint.MapGet("/candidates", (FlintPaths paths, MigrationDecisionStore migrationDecisions,
+            InstanceList instances) =>
+        {
+            var candidates = FlintMigration.Detect(paths, migrationDecisions, instances.InstanceDirs);
+            return Results.Ok(new FlintMigrationCandidatesResponse(
+                candidates.LegacyRoot?.Value, candidates.RemountDecided,
+                candidates.IniChainFile?.Value, candidates.PendingInstances, candidates.Any));
+        }).Produces<FlintMigrationCandidatesResponse>();
+
+        flint.MapPost("/", (FlintPaths paths, MigrationDecisionStore migrationDecisions,
+            FlintConfigStore config, ISecretStore secrets, LauncherStateStore state,
+            InstanceList instances, InstanceMutationLock instanceLock, FlintTaskRegistry registry) =>
+        {
+            // the remount half can move gigabytes — it runs as a background task like the
+            // prism import; each half is idempotent, so the task is safe to re-run
+            var entry = registry.Start("flint-migration", async handle =>
+            {
+                try
+                {
+                    await handle.RunAsync(token => Task.Run(() => FlintMigration.RunAll(
+                        paths, migrationDecisions, config, secrets, state,
+                        instances.InstanceDirs,
+                        instances.Environment.ConfigInfo, instances.Environment.StateInfo),
+                        token)).ConfigureAwait(false);
+                }
+                finally
+                {
+                    // the conversion materialized instance directories: the live list must
+                    // see them, serialized like every endpoint mutation of the list
+                    instanceLock.Wait();
+                    try
+                    {
+                        instances.LoadList();
+                    }
+                    finally
+                    {
+                        instanceLock.Release();
+                    }
+                }
+            }, instanceId: null);
+
+            return Results.Accepted($"/api/v1/tasks/{entry.Id}", new TaskAcceptedResponse(entry.Id));
+        }).Produces<TaskAcceptedResponse>(202);
     }
 
     private static bool TryParseMode(string? mode, out ImportMode parsed, out string error)

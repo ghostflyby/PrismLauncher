@@ -18,39 +18,27 @@ public class WebHostAssemblyTests
     public void Runtime_Assembly_Crash_Is_Diagnosable_In_The_File_Log()
     {
         var home = Path.Combine(Path.GetTempPath(), $"flint-crash-{Guid.NewGuid():N}");
-        string? ini = null;
         try
         {
-            Directory.CreateDirectory(Path.Combine(home, "config"));
-            ini = Path.Combine(home, "config", "flint.cfg");
-            File.WriteAllText(ini, "[General]\nLanguage=x\n");
-            if (OperatingSystem.IsWindows())
-            {
-                return; // the unreadable-file sabotage is a POSIX mode trick
-            }
+            Directory.CreateDirectory(Path.Combine(home, "data"));
 
-            File.SetUnixFileMode(ini, UnixFileMode.None);
-
-            // the unreadable chain INI makes the import throw during the core assembly
-            // (IniFile.LoadFile catches IOException only) — the crash must be
+            // a FILE occupying the instances-directory anchor makes the assembly's
+            // materialization fail (EnsureFolderPathExists yields null) — the crash must be
             // written to the file sink before the exception re-emerges
+            File.WriteAllText(Path.Combine(home, "data", "instances"), "occupied by a file");
+
             var crash = Record.Exception(() =>
                 WebHostBuilder.BuildWebApplication(["--home-dir", home]));
 
             Assert.NotNull(crash); // fail-fast preserved: no half-assembled host, no silent start
             var log = File.ReadAllText(Path.Combine(home, "state", "logs", "Flint-0.log"));
             Assert.Contains("runtime assembly failed", log);
-            Assert.Contains("UnauthorizedAccessException", log);
+            Assert.Contains("NullReferenceException", log);
         }
         finally
         {
             try
             {
-                if (ini is not null && File.Exists(ini) && !OperatingSystem.IsWindows())
-                {
-                    File.SetUnixFileMode(ini, UnixFileMode.UserRead | UnixFileMode.UserWrite);
-                }
-
                 Directory.Delete(home, recursive: true);
             }
             catch (DirectoryNotFoundException) { }

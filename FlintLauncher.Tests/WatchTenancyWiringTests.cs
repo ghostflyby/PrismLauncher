@@ -35,6 +35,7 @@ public class WatchTenancyWiringTests : IDisposable
         var dir = instancesDir / id;
         dir.CreateDirectory();
         (dir / "instance.cfg").WriteAllLines(["InstanceType=OneSix", "name=" + id]);
+        TestLegacyConversion.Convert(instancesDir);
     }
 
     private InstanceList CreateList(AbsolutePath instancesDir) =>

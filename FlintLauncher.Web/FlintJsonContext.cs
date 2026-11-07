@@ -151,6 +151,8 @@ namespace FlintLauncher.Web;
 [JsonSerializable(typeof(PrismImportPlanResponse))]
 [JsonSerializable(typeof(PrismImportDryRunResponse))]
 [JsonSerializable(typeof(PrismImportPlanItem))]
+// migration layer (the manual flint run): pending view
+[JsonSerializable(typeof(FlintMigrationCandidatesResponse))]
 // migration decision records — TypedJsonFile root
 [JsonSerializable(typeof(MigrationDecisionRecord))]
 // store completeness: the derived {complete, missing[], bytes} report

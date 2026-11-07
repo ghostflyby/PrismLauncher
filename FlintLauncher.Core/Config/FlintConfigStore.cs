@@ -65,6 +65,11 @@ public sealed class FlintConfigStore : IOptionsFactory<FlintConfigFile>, IOption
 
     public AbsolutePath FilePath => _file.FilePath;
 
+    /// <summary>The raw on-disk payload, absent members null (no fold): what a migration
+    /// projects onto — everything else reads the resolved <see cref="Current"/>. A
+    /// missing/unreadable/corrupt file yields null (the caller seeds).</summary>
+    internal FlintConfigFile? RawPayload() => _file.LoadOrNull();
+
     /// <summary>The fresh-install default (every domain record at its property defaults).</summary>
     public static FlintConfigFile CurrentDefault() => FlintConfigFile.Default();
 

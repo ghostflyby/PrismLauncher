@@ -14,6 +14,7 @@ using System.Collections.Concurrent;
 using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
+using FlintLauncher.Core.Migration;
 using FlintLauncher.Core.State;
 using FlintLauncher.Web;
 using TruePath;
@@ -100,6 +101,22 @@ internal static class TestInstanceEnvironment
 {
     public static InstanceEnvironment Default(FlintConfigStore? user = null) => new(user?.Monitor,
         FlintJsonContext.Default.InstanceConfigFile, FlintJsonContext.Default.InstanceStateFile);
+}
+
+/// <summary>What the manual migration does to cfg-only instance directories — fixtures run
+/// it after writing instance.cfg so the fixture mirrors a migrated install (discovery lists
+/// instance.json directories only; nothing reads the cfg at load time anymore).</summary>
+internal static class TestLegacyConversion
+{
+    public static LegacyInstanceConversion.Result Convert(AbsolutePath instancesRoot) =>
+        LegacyInstanceConversion.Convert([instancesRoot],
+            FlintJsonContext.Default.InstanceConfigFile,
+            FlintJsonContext.Default.InstanceStateFile);
+
+    public static bool ConvertOne(AbsolutePath instanceDir) =>
+        LegacyInstanceConversion.ConvertOne(instanceDir,
+            FlintJsonContext.Default.InstanceConfigFile,
+            FlintJsonContext.Default.InstanceStateFile);
 }
 
 /// <summary>A throwaway launcher-state store (the real one over a temp file) for tests that

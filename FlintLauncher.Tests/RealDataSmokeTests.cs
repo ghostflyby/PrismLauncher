@@ -36,39 +36,71 @@ public class RealDataSmokeTests
             FlintJsonContext.Default.InstanceConfigFile, FlintJsonContext.Default.InstanceStateFile);
 
         var instancesDir = Path.Combine(DataDir, "instances");
-        var found = 0;
-        var withProfile = 0;
-        foreach (var dir in Directory.EnumerateDirectories(instancesDir))
+        // the real data stays READ-ONLY: the metadata a load needs is mirrored into a
+        // throwaway copy, and the migration pass runs there
+        var scratch = Path.Combine(Path.GetTempPath(), $"flint-realsmoke-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(scratch);
+        try
         {
-            var cfg = Path.Combine(dir, "instance.cfg");
-            if (!File.Exists(cfg))
+            var found = 0;
+            var withProfile = 0;
+            foreach (var dir in Directory.EnumerateDirectories(instancesDir))
             {
-                continue; // instgroups.json and co.
+                var cfg = Path.Combine(dir, "instance.cfg");
+                if (!File.Exists(cfg))
+                {
+                    continue; // instgroups.json and co.
+                }
+
+                var mirror = Path.Combine(scratch, Path.GetFileName(dir));
+                Directory.CreateDirectory(mirror);
+                File.Copy(cfg, Path.Combine(mirror, "instance.cfg"));
+                var mmcPack = Path.Combine(dir, "mmc-pack.json");
+                var patches = Path.Combine(dir, "patches");
+                if (File.Exists(mmcPack))
+                {
+                    File.Copy(mmcPack, Path.Combine(mirror, "mmc-pack.json"));
+                    if (Directory.Exists(patches))
+                    {
+                        Directory.CreateDirectory(Path.Combine(mirror, "patches"));
+                        foreach (var patch in Directory.EnumerateFiles(patches, "*.json"))
+                        {
+                            File.Copy(patch, Path.Combine(mirror, "patches", Path.GetFileName(patch)));
+                        }
+                    }
+                }
+
+                TestLegacyConversion.ConvertOne(new AbsolutePath(mirror));
+
+                found++;
+                var instancePath = new AbsolutePath(mirror);
+                var instance = new MinecraftInstance(
+                    new InstanceJsonSettingsObject(instancePath, environment), instancePath);
+                Assert.Equal("OneSix", instance.InstanceType());
+                Assert.False(string.IsNullOrEmpty(instance.Uuid));
+                Assert.True(instance.GameRoot.Value is { Length: > 0 });
+
+                if (File.Exists(mmcPack))
+                {
+                    var profile = instance.GetPackProfile();
+                    profile.Load();
+                    Assert.True(profile.Components.Count > 0, $"{dir}: no components loaded");
+                    var mcVersion = profile.GetComponentVersion("net.minecraft");
+                    Assert.False(string.IsNullOrEmpty(mcVersion));
+                    withProfile++;
+                }
             }
 
-            found++;
-            var instancePath = new AbsolutePath(dir);
-            var instance = new MinecraftInstance(
-                new InstanceJsonSettingsObject(instancePath, environment), instancePath);
-            Assert.Equal("OneSix", instance.InstanceType());
-            Assert.False(string.IsNullOrEmpty(instance.Uuid));
-            Assert.True(instance.GameRoot.Value is { Length: > 0 });
-            // read-only: the dual-track load must not materialize anything in the real dir
-            Assert.False(File.Exists(Path.Combine(dir, "instance.json")));
-
-            var mmcPack = Path.Combine(dir, "mmc-pack.json");
-            if (File.Exists(mmcPack))
-            {
-                var profile = instance.GetPackProfile();
-                profile.Load();
-                Assert.True(profile.Components.Count > 0, $"{dir}: no components loaded");
-                var mcVersion = profile.GetComponentVersion("net.minecraft");
-                Assert.False(string.IsNullOrEmpty(mcVersion));
-                withProfile++;
-            }
+            Assert.True(found >= 3, $"expected several instances, found {found}");
+            Assert.True(withProfile >= 3, $"expected several with components, got {withProfile}");
         }
-
-        Assert.True(found >= 3, $"expected several instances, found {found}");
-        Assert.True(withProfile >= 3, $"expected several with components, got {withProfile}");
+        finally
+        {
+            try
+            {
+                Directory.Delete(scratch, recursive: true);
+            }
+            catch (DirectoryNotFoundException) { }
+        }
     }
 }

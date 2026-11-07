@@ -1,18 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
-//
-// The unified migration engine: the Prism→Flint import pipeline
-// (FileTransfer merge semantics + whitelists) is promoted to a general engine whose SOURCES
-// are profiled. Two profiles:
-//  - prism-family  : prism/polymc/multimc — the existing whitelist, API-driven (never
-//                    auto-runs; the /api/v1/migration/prism endpoints drive it);
-//  - flint-legacy  : the old flat Flint layout (flint.cfg / metacache.json / meta / cache /
-//                    assets / libraries / java at the root layer) remounted onto the
-//                    five-root layout — the startup probe auto-runs it ONCE
-//                    (FlintLegacyMigration.ExecuteIfNeeded) and doubles as the one-time cleanup
-//                    of the Prism bare metacache ledger.
-// The profiles share the decision records (state/migration/<source>.json), so both are
-// one-shot decisions a host can display.
 
 using System.Globalization;
 using System.Security;
@@ -44,10 +31,6 @@ public interface IMigrationSourceProfile
     /// decisions: state/migration/&lt;Name&gt;.json).</summary>
     string Name { get; }
 
-    /// <summary>Prism-family is API-driven and never auto-runs; flint-legacy auto-runs
-    /// exactly once at startup (its detection being positive AND its decision unrecorded).</summary>
-    bool AutoRunAtStartup { get; }
-
     /// <summary>Enumerate the importable sources of this profile against the given layout.
     /// Empty = nothing to migrate.</summary>
     IReadOnlyList<MigrationSourceCandidate> Detect(FlintPaths paths, MigrationDecisionStore? decisions);
@@ -74,8 +57,6 @@ public sealed class PrismFamilyMigrationProfile : IMigrationSourceProfile
     }
 
     public string Name => ProfileName;
-
-    public bool AutoRunAtStartup => false;
 
     public IReadOnlyList<MigrationSourceCandidate> Detect(FlintPaths paths, MigrationDecisionStore? decisions)
     {
@@ -105,9 +86,9 @@ public sealed class PrismFamilyMigrationProfile : IMigrationSourceProfile
 
 /// <summary>The flint-legacy profile: the pre-reform flat Flint layout (config/ledger/content
 /// anchors at the root layer) remounted onto the five-root layout. Detected against the data
-/// root (where the old flat layout actually lives); auto-runs ONCE at startup
-/// (<see cref="FlintLegacyMigration.ExecuteIfNeeded"/>) — eager, no lazy dual-read: the
-/// migration completes in a single pass.
+/// root (where the old flat layout actually lives); run on request
+/// (<see cref="FlintMigration.RunAll"/>) — eager, no lazy dual-read: the migration completes
+/// in a single pass.
 ///
 /// NOTE on the anchor set: only items that MOVED off the data root count as legacy anchors
 /// (flint.cfg / the pre-reform ledgers / meta / cache / assets / libraries / java).
@@ -119,8 +100,6 @@ public sealed class FlintLegacyMigrationProfile : IMigrationSourceProfile
     public const string ProfileName = "flint-legacy";
 
     public string Name => ProfileName;
-
-    public bool AutoRunAtStartup => true;
 
     /// <summary>The root-layer anchors of the old flat layout: the moved config/ledger files
     /// (flint.cfg, both ledger spellings — Flint's metacache.json and the Prism bare
@@ -250,15 +229,16 @@ public sealed class FlintLegacyMigrationProfile : IMigrationSourceProfile
     }
 }
 
-/// <summary>The flint-legacy eager pass (the startup probe that
-/// remounts the pre-reform flat layout onto the five roots ONCE — no decision record means
-/// run it, then seal with the decision record so the probe never fires again. The pass doubles as
-/// the one-time cleanup (a Prism bare <c>metacache</c> ledger in the target directory is
+/// <summary>The flint-legacy eager remount pass (the record-gated half of the manual flint
+/// migration — <see cref="FlintMigration.RunAll"/> — that remounts the pre-reform flat
+/// layout onto the five roots ONCE: no decision record means run it, then seal with the
+/// decision record so a decided layout is never re-proposed. The pass doubles as the
+/// one-time cleanup (a Prism bare <c>metacache</c> ledger in the target directory is
 /// dead weight — the whitelist never carried it, existing stock is deleted). A failed
-/// transfer writes no record: the next startup resumes the idempotent merge. Two entries:
-/// <see cref="ExecuteIfNeeded"/> is the gated startup auto-run; <see cref="Execute(FlintPaths, AbsolutePath)"/> is the
-/// record-less transfer the prism import-finished hook runs (the record gates the AUTO-RUN,
-/// never the remount itself).</summary>
+/// transfer writes no record: the next run resumes the idempotent merge. Two entries:
+/// <see cref="ExecuteIfNeeded"/> is the record-gated half; <see cref="Execute(FlintPaths, AbsolutePath)"/> is the
+/// record-less transfer the prism import-finished hook runs (the record gates the GATED
+/// entry, never the remount itself).</summary>
 public static class FlintLegacyMigration
 {
     /// <summary>What the eager pass did (the host logs it; tests assert it).</summary>
@@ -267,20 +247,20 @@ public static class FlintLegacyMigration
         public static readonly Result Skipped = new(false, 0, 0, false, null);
     }
 
-    /// <summary>The STARTUP entry: probe and, when an UNDECIDED legacy
+    /// <summary>The RECORD-GATED entry: probe and, when an UNDECIDED legacy
     /// layout is detected, remount it (Move semantics: same-volume rename, cross-volume
     /// clone/copy + source delete — the flat layout is gone after the pass) and seal with
     /// the decision record. Every detected legacy root remounts in the ONE pass (the data
     /// root and a legacy home root — the double-legacy state an import crash leaves behind)
     /// and one complete aggregate seals the single profile-level record. The record
-    /// gates the AUTO-RUN only — it must never gate the remount itself (an upgraded user
+    /// gates the GATED entry only — it must never gate the remount itself (an upgraded user
     /// carries the record permanently; a second prism
     /// import lands fresh shared content at the data root afterwards, and that remount is
     /// the record-less <see cref="Execute(FlintPaths, AbsolutePath)"/> entry). A no-op probe (anchors present but
     /// nothing whitelisted to remount) writes NO record: nothing was imported, and the
-    /// next startup's probe is a handful of existence checks. A FAILED transfer — exception
-    /// OR per-file transfer failure — writes NO record either: the next startup resumes
-    /// the idempotent merge (destination exists → skip), which is the honest outcome of a
+    /// next probe is a handful of existence checks. A FAILED transfer — exception
+    /// OR per-file transfer failure — writes NO record either: the next run resumes the
+    /// idempotent merge (destination exists → skip), which is the honest outcome of a
     /// half-done remount.</summary>
     public static Result ExecuteIfNeeded(FlintPaths paths, MigrationDecisionStore? decisions)
     {
@@ -324,7 +304,7 @@ public static class FlintLegacyMigration
             if (pass.Error is not null)
             {
                 // the single-source semantics hold across roots: an incomplete pass stops the
-                // aggregate and seals NO record — the next startup resumes the idempotent merge
+                // aggregate and seals NO record — the next run resumes the idempotent merge
                 error = pass.Error;
                 break;
             }
@@ -332,10 +312,10 @@ public static class FlintLegacyMigration
 
         if (ran && error is null)
         {
-            // a COMPLETE remount seals the startup auto-run: the probe never fires again.
-            // Fault-tolerant like PrismImportTask.RecordImportDecision: the record seals a
-            // COMPLETE remount; a failed seal write resumes as an honest no-op probe next
-            // startup (the remount itself already tolerated IO failures).
+            // a COMPLETE remount seals the gated entry: the decided layout is never
+            // re-proposed. Fault-tolerant like PrismImportTask.RecordImportDecision: the
+            // record seals a COMPLETE remount; a failed seal write resumes as an honest
+            // no-op probe on the next run (the remount itself already tolerated IO failures).
             try
             {
                 decisions?.Write(new MigrationDecisionRecord
@@ -360,16 +340,16 @@ public static class FlintLegacyMigration
     }
 
     /// <summary>The RECORD-LESS transfer entry (the prism import-completion hook,
-    /// PrismImportCompletion.Run): performs exactly the startup remount — the
+    /// PrismImportCompletion.Run): performs exactly the gated entry's remount — the
     /// whitelist mounts, the in-data cache children, the bare-ledger cleanup — WITHOUT
-    /// consulting or writing the decision record. The record exists to keep the startup
-    /// AUTO-RUN one-shot; the hook runs after every prism import, where a recorded
+    /// consulting or writing the decision record. The record exists to keep the gated
+    /// entry one-shot; the hook runs after every prism import, where a recorded
     /// decision (every upgraded user, any second import) would otherwise strand the
     /// freshly imported assets/libraries/meta at the data root forever — the store side
     /// would re-download GBs of content that is already on disk (the import
     /// pipeline completes ALL sorting in a single pass). The transfer is idempotent
     /// (destination exists → skip), and a failed pass leaves the data at the data root for
-    /// the next import's retry (or the startup resume when no record seals it).</summary>
+    /// the next import's retry (or the gated entry's resume when no record seals it).</summary>
     public static Result Execute(FlintPaths paths) => Execute(paths, paths.DataRoot);
 
     public static Result Execute(FlintPaths paths, AbsolutePath sourceRoot)
@@ -472,7 +452,7 @@ public static class FlintLegacyMigration
                                       or ArgumentException or NotSupportedException
                                       or SecurityException)
         {
-            // no record — the next startup resumes the idempotent merge (destination
+            // no record — the next run resumes the idempotent merge (destination
             // exists → skip), which is the honest outcome of a half-done remount
             return new Result(true, moved, bytes, ledgerCleaned, e.Message);
         }
@@ -491,7 +471,7 @@ public static class FlintLegacyMigration
         {
             // anchors (e.g. a lone instances/ directory) but nothing the whitelist carries:
             // nothing was imported — the entry stays cheap and honest (NO record here; the
-            // startup entry seals the record over a complete run, this one never writes)
+            // gated entry seals the record over a complete run, this one never writes)
             return new Result(false, 0, 0, false, null);
         }
 
@@ -522,7 +502,7 @@ public static class FlintLegacyMigration
                 return 0; // idempotent resume: the destination file won
             }
 
-            // the destination directory exists (an earlier startup created it, or a
+            // the destination directory exists (an earlier run created it, or a
             // previous pass stopped halfway): merge the source into it file by file —
             // files already at the destination skip, missing ones transfer
             long resumed = 0;
@@ -584,7 +564,7 @@ public static class FlintLegacyMigration
 
     /// <summary>Move the children of one legacy directory into a destination directory, one
     /// entry at a time. The destination directory itself may already exist (created by an
-    /// earlier startup or a resumed pass) — a whole-dir move would hit the
+    /// earlier run or a resumed pass) — a whole-dir move would hit the
     /// destination-exists skip and strand the source children forever.</summary>
     private static void MoveChildren(AbsolutePath parent, string child, AbsolutePath destinationDir,
         ref int moved, ref long bytes, ref int failedFiles)
@@ -605,8 +585,7 @@ public static class FlintLegacyMigration
     }
 }
 
-/// <summary>The engine facade: the registered profiles, lookups by name, and the
-/// auto-run predicate (a profile that auto-runs AND has an undecided detected source).</summary>
+/// <summary>The engine facade: the registered profiles and lookups by name.</summary>
 public sealed class MigrationEngine(IEnumerable<IMigrationSourceProfile> profiles)
 {
     private readonly IReadOnlyList<IMigrationSourceProfile> _profiles = [.. profiles];
@@ -633,12 +612,4 @@ public sealed class MigrationEngine(IEnumerable<IMigrationSourceProfile> profile
 
         return found;
     }
-
-    /// <summary>Profiles that would auto-run at startup — AutoRunAtStartup profiles with
-    /// at least one detected, still-undecided source.</summary>
-    public IReadOnlyList<IMigrationSourceProfile> AutoRunCandidates(FlintPaths paths,
-        MigrationDecisionStore? decisions) =>
-        _profiles.Where(profile => profile.AutoRunAtStartup &&
-                                   profile.Detect(paths, decisions).Any(candidate => !candidate.DecisionRecorded))
-            .ToList();
 }

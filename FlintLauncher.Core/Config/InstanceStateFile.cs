@@ -8,7 +8,6 @@
 // out: they are runtime data, not configuration, and never participate in the layer stack.
 
 using System.Text.Json.Serialization.Metadata;
-using FlintLauncher.Core.Settings;
 using TruePath;
 using TruePath.SystemIo;
 
@@ -27,14 +26,9 @@ public sealed record InstanceStateFile : IStateVersioned
 }
 
 /// <summary>The instance-state.json store: one TypedJsonFile per instance directory, loaded
-/// through the shared stateVersion gate, immediate atomic write on every
-/// mutation (SetMinecraftRunning writes on every launch/stop). Not thread-safe across
-/// instances; the adapter serializes per store like FlintConfigStore does.
-///
-/// Dual-track: a Prism-format instance keeps the trio inside instance.cfg — while
-/// instance-state.json does not exist, the cfg's values seed the in-memory snapshot
-/// READ-ONLY (the C++ kept lastLaunchTime/totalTimePlayed in the cfg); the first mutation
-/// materializes instance-state.json and the cfg's copies are ignored from then on.</summary>
+/// through the shared stateVersion gate, immediate atomic write on every mutation
+/// (SetMinecraftRunning writes on every launch/stop). Not thread-safe across
+/// instances; the adapter serializes per store like FlintConfigStore does.</summary>
 public sealed class InstanceStateStore
 {
     private readonly object _lock = new();
@@ -44,29 +38,7 @@ public sealed class InstanceStateStore
     {
         FilePath = instanceRoot / "instance-state.json";
         _file = new TypedJsonFile<InstanceStateFile>(FilePath, typeInfo);
-        if (FilePath.ExistsFile())
-        {
-            Current = Load();
-            return;
-        }
-
-        // the read-only seed from the legacy cfg (zeros when there is none): the C++ kept
-        // the trio inside instance.cfg, and the split must not lose it on a load that
-        // performs no write — the first mutation materializes instance-state.json
-        var legacyCfg = instanceRoot / InstanceIniImporter.LegacyFileName;
-        var ini = new IniFile();
-        Current = ini.LoadFile(legacyCfg)
-            ? new InstanceStateFile
-            {
-                StateVersion = InstanceStateFile.CurrentVersion,
-                LastLaunchTime = Variant.AsLong(Variant.FromIniValue(
-                    ini.GetValueOrDefault("lastLaunchTime") ?? IniValue.Invalid)),
-                LastTimePlayed = Variant.AsLong(Variant.FromIniValue(
-                    ini.GetValueOrDefault("lastTimePlayed") ?? IniValue.Invalid)),
-                TotalTimePlayed = Variant.AsLong(Variant.FromIniValue(
-                    ini.GetValueOrDefault("totalTimePlayed") ?? IniValue.Invalid)),
-            }
-            : CurrentDefault();
+        Current = FilePath.ExistsFile() ? Load() : CurrentDefault();
     }
 
     /// <summary>The current in-memory snapshot. Treat as immutable — mutate through Update.</summary>
@@ -91,9 +63,9 @@ public sealed class InstanceStateStore
         }
     }
 
-    /// <summary>The dual-track conversion half: persist the current snapshot so the
-    /// trio's home is instance-state.json. Called by the settings adapter on the first write
-    /// of ANY kind — after the format switch the legacy cfg must feed nothing anymore.</summary>
+    /// <summary>Materialize the trio's home now, with the current (possibly zero) snapshot:
+    /// a fresh instance's first write of ANY kind lands the state file beside the config, so
+    /// runtime state never depends on a later mutation to exist on disk.</summary>
     public void EnsureMaterialized()
     {
         if (!Exists)

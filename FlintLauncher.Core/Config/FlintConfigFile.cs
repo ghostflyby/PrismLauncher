@@ -18,6 +18,7 @@
 // live in the secret store (FlintLauncher.Core.Secrets) and code reads them by name through
 // ISecretStore — the config format carries no secret fields.
 
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Serialization;
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Net;
@@ -27,6 +28,7 @@ namespace FlintLauncher.Core.Config;
 /// <summary>The flint.json user-layer root. The JSON shape is one object with a
 /// camelCase member per domain; a future system layer is another
 /// payload of the same record at the head of the fold stack — the format does not change.</summary>
+[DynamicallyAccessedMembers(ConfigRecord.Members)]
 public sealed record FlintConfigFile
 {
     /// <summary>The fresh-install default: the single source of the C++
@@ -217,8 +219,20 @@ public sealed record FlintConfigFile
     public ToolsConfig Tools { get; init; }
 }
 
+/// <summary>The reflection-rooting shape of every config record: the legacy-config migration
+/// projects onto this closed set by member name (Core/Migration/LegacyConfigProjection.cs),
+/// and the annotation is what lets the trimmer vouch for members reached that way — the
+/// Native AOT publish stays warning-free. No dynamic type ever enters the set.</summary>
+public static class ConfigRecord
+{
+    public const DynamicallyAccessedMemberTypes Members =
+        DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.PublicConstructors
+        | DynamicallyAccessedMemberTypes.PublicMethods;
+}
+
 /// <summary>Launcher shell + concurrency/network behavior (the C++ "launcher" settings
 /// sections: parallelism, instance-list ordering, launcher close-on-launch switches).</summary>
+[DynamicallyAccessedMembers(ConfigRecord.Members)]
 public sealed record LauncherConfig
 {
     /// <summary>GUI-only today (no window chrome is ported); kept so the /settings wire
@@ -237,6 +251,7 @@ public sealed record LauncherConfig
 
 /// <summary>Console visibility + the line buffer (ConsoleMaxLines/ConsoleOverflowStop are
 /// the passthrough pair: never instance-layered, they stay global-only).</summary>
+[DynamicallyAccessedMembers(ConfigRecord.Members)]
 public sealed record ConsoleConfig
 {
     public bool? ShowConsole { get; init; }
@@ -248,6 +263,7 @@ public sealed record ConsoleConfig
 }
 
 /// <summary>Game-time display/recording (BaseInstance override-gated at the instance layer).</summary>
+[DynamicallyAccessedMembers(ConfigRecord.Members)]
 public sealed record GameTimeConfig
 {
     public bool? ShowGameTime { get; init; }
@@ -257,6 +273,7 @@ public sealed record GameTimeConfig
 }
 
 /// <summary>Launch window shape (the C++ "Window Size" section).</summary>
+[DynamicallyAccessedMembers(ConfigRecord.Members)]
 public sealed record WindowConfig
 {
     public bool? LaunchMaximized { get; init; }
@@ -265,6 +282,7 @@ public sealed record WindowConfig
 }
 
 /// <summary>JVM memory allocation.</summary>
+[DynamicallyAccessedMembers(ConfigRecord.Members)]
 public sealed record MemoryConfig
 {
     /// <summary>Port of SysInfo::defaultMaxJvmMem: below 6 GiB of total RAM the heap default
@@ -294,6 +312,7 @@ public sealed record MemoryConfig
 }
 
 /// <summary>Linux-only performance wrappers (the C++ "Performance" section).</summary>
+[DynamicallyAccessedMembers(ConfigRecord.Members)]
 public sealed record PerformanceConfig
 {
     public bool? EnableFeralGamemode { get; init; }
@@ -303,6 +322,7 @@ public sealed record PerformanceConfig
 }
 
 /// <summary>Native library workarounds (system OpenAL/GLFW/SDL vs the bundled copies).</summary>
+[DynamicallyAccessedMembers(ConfigRecord.Members)]
 public sealed record NativeLibConfig
 {
     public bool? UseNativeOpenAl { get; init; }
@@ -314,6 +334,7 @@ public sealed record NativeLibConfig
 }
 
 /// <summary>Custom commands around the game process (BaseInstance override-gated).</summary>
+[DynamicallyAccessedMembers(ConfigRecord.Members)]
 public sealed record CommandsConfig
 {
     public string? PreLoadCommand { get; init; }
@@ -325,6 +346,7 @@ public sealed record CommandsConfig
 /// <summary>Minecraft-miscellaneous: the legacy-services OnlineFixes gate and the custom
 /// environment map. Read compat accepts the legacy embedded-JSON string form (the C++
 /// stored it as its JSON object text); writes are the native object.</summary>
+[DynamicallyAccessedMembers(ConfigRecord.Members)]
 public sealed record MinecraftMiscConfig
 {
     public bool? OnlineFixes { get; init; }
@@ -335,6 +357,7 @@ public sealed record MinecraftMiscConfig
 
 /// <summary>Mod-download behavior (the ModDownloadLoaders gate family; #3404 release
 /// channels stay their JSON string-list form).</summary>
+[DynamicallyAccessedMembers(ConfigRecord.Members)]
 public sealed record ModDownloadConfig
 {
     public bool? ModMetadataDisabled { get; init; }
@@ -348,6 +371,7 @@ public sealed record ModDownloadConfig
 /// <summary>Java location/arguments plus the automatic-java machinery. The probe quintet
 /// (JavaSignature/Architecture/RealArchitecture/Version/Vendor) is deliberately absent —
 /// launcher-state.json owns the path-keyed probe cache.</summary>
+[DynamicallyAccessedMembers(ConfigRecord.Members)]
 public sealed record JavaConfig
 {
     public string? JavaPath { get; init; }
@@ -367,6 +391,7 @@ public sealed record JavaConfig
 /// true dead setting — zero core consumers; it is no longer registered, so an
 /// imported INI's leftover key simply stays unread). JavaDir resolves under store root
 /// semantics since the store remount.</summary>
+[DynamicallyAccessedMembers(ConfigRecord.Members)]
 public sealed record DirsConfig
 {
     /// <summary>QStandardPaths::writableLocation(DownloadLocation) approximation. The C++
@@ -388,6 +413,7 @@ public sealed record DirsConfig
 }
 
 /// <summary>Language selection (the translations UI is not ported; wire-only).</summary>
+[DynamicallyAccessedMembers(ConfigRecord.Members)]
 public sealed record LanguageConfig
 {
     public string? Language { get; init; }
@@ -396,6 +422,7 @@ public sealed record LanguageConfig
 
 /// <summary>Metadata/resource mirror overrides (the C++ resets invalid URLs; the port
 /// stores the raw string).</summary>
+[DynamicallyAccessedMembers(ConfigRecord.Members)]
 public sealed record MirrorConfig
 {
     public string? MetaUrlOverride { get; init; }
@@ -405,6 +432,7 @@ public sealed record MirrorConfig
 
 /// <summary>Proxy coordinates. NO Pass member: the proxy password is a secret, read by
 /// name from the secret store.</summary>
+[DynamicallyAccessedMembers(ConfigRecord.Members)]
 public sealed record ProxyConfig
 {
     public string? ProxyType { get; init; }
@@ -415,6 +443,7 @@ public sealed record ProxyConfig
 
 /// <summary>API customization. NO credential members: FlameKeyOverride/ModrinthToken
 /// live in the secret store; MSAClientIDOverride is a public client id and stays here.</summary>
+[DynamicallyAccessedMembers(ConfigRecord.Members)]
 public sealed record ApiConfig
 {
     public string? MsaClientIdOverride { get; init; }
@@ -427,6 +456,7 @@ public sealed record ApiConfig
 
 /// <summary>External tool paths (the C++ ExternalToolsPage tools; the profiler launchers
 /// read JProfilerPath/JVisualVMPath).</summary>
+[DynamicallyAccessedMembers(ConfigRecord.Members)]
 public sealed record ToolsConfig
 {
     public string? JsonEditor { get; init; }

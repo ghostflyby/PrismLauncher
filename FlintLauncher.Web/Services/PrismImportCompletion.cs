@@ -16,19 +16,18 @@ namespace FlintLauncher.Web.Services;
 /// live state. The import pipeline's shared content (assets/libraries/meta) lands at the
 /// DATA root while the store/cache bases read from the five-root mounts, so the SAME
 /// session immediately runs the flint-legacy remount pass over what just landed (without
-/// it the launcher would re-download GBs until the next process start). The INI sort and
-/// the account list rejoin the pass for the same reason: the whitelist lands
-/// prismlauncher.cfg/polymc.cfg/… and accounts.json at the data root, and the startup
-/// assembly that consumes them (the config importer, AccountList.LoadList) already ran
-/// BEFORE any import existed — a session without this half would need a restart before
-/// the imported settings/secrets/state keys/accounts took effect, and a user writing any
-/// setting in between would create flint.json and seal the INI away forever (the one-shot
-/// guard).</summary>
+/// it the launcher would re-download GBs until the next process start). The INI projection
+/// and the eager instance.cfg conversion rejoin the pass for the same reason: the imported
+/// prismlauncher.cfg and instance directories are legacy material the manual flint
+/// migration would otherwise have to be triggered for, and the instances are invisible to
+/// discovery until the conversion materializes their instance.json. The account list
+/// reloads for the same session too.</summary>
 public sealed class PrismImportCompletion(
     FlintPaths paths,
     FlintConfigStore config,
     ISecretStore secrets,
     LauncherStateStore state,
+    MigrationDecisionStore migrationDecisions,
     AccountList accounts,
     InstanceList instances,
     InstanceMutationLock instanceLock)
@@ -38,13 +37,13 @@ public sealed class PrismImportCompletion(
         try
         {
             // the RECORD-LESS remount entry: the record must not gate this pass — it
-            // seals the STARTUP auto-run only (an upgraded user carries the record
-            // permanently, so the gated ExecuteIfNeeded would skip here forever and the
+            // seals the MANUAL migration only (an upgraded user carries the record
+            // permanently, so the gated entry would skip here forever and the
             // freshly imported assets/libraries/meta would stay stranded at the data root,
             // re-downloaded GB-level on the store side). The remount itself is idempotent;
             // a failed pass leaves the data at the data root for the next import's retry.
             // Runs FIRST: it is what carries a flint.cfg onto the config root, where the
-            // importer's chain probe looks before the data root.
+            // projection's chain probe looks before the data root.
             FlintLegacyMigration.Execute(paths);
         }
         catch
@@ -54,20 +53,31 @@ public sealed class PrismImportCompletion(
 
         try
         {
-            // the single pass over what the import just landed. Runs against the LIVE
-            // stores, so every destination is same-session visible without a restart:
-            // the secret trio → ISecretStore (disk-backed, every read hits the file), the
-            // state keys → LauncherStateStore.Update (Current swaps in memory), the
-            // rest → FlintConfigStore.Update (Current swaps AND flint.json lands — which
-            // is itself the one-shot seal). The importer's own guards keep the semantics:
-            // flint.json already present → Idle (the one-shot never re-fires, even when a
-            // setting was written mid-import), no chain file at any root → Idle (this
-            // import carried no INI — nothing to sort).
-            FlintConfigImporter.ImportIfNeeded(paths, config, secrets, state);
+            // the config projection over what the import landed: the secret trio →
+            // ISecretStore, the state keys → LauncherStateStore, the rest → flint.json
+            // (merge semantics — a value the user already wrote wins over the INI). A run
+            // seals the candidate view's one-shot record: the chain file stays on disk and
+            // would otherwise be re-proposed forever.
+            if (FlintConfigImporter.Import(paths, config, secrets, state).ImportedIni is not null)
+            {
+                FlintMigration.SealConfigDecision(migrationDecisions);
+            }
         }
         catch
         {
-            // an import failure must not break the task terminal event
+            // a projection failure must not break the task terminal event
+        }
+
+        try
+        {
+            // the imported instance directories carry only instance.cfg: materialize
+            // instance.json (and the time trio's home) so discovery lists them
+            LegacyInstanceConversion.Convert(instances.InstanceDirs,
+                instances.Environment.ConfigInfo, instances.Environment.StateInfo);
+        }
+        catch
+        {
+            // a conversion failure must not break the task terminal event
         }
 
         try

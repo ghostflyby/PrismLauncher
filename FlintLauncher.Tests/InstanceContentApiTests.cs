@@ -149,6 +149,8 @@ internal static class WaveSeed
             LaunchFixture.DefaultPatchJson);
         File.WriteAllText(Path.Combine(instanceRoot, "mmc-pack.json"),
             """{"formatVersion":1,"components":[{"important":true,"uid":"net.minecraft"}]}""");
+        // the migration pass a cfg-only directory goes through before the host lists it
+        TestLegacyConversion.Convert(new AbsolutePath(InstancesDir(homeDir)));
         return instanceRoot;
     }
 

@@ -41,6 +41,7 @@ using System.IO.Compression;
 using System.Text.RegularExpressions;
 using FlintLauncher.Core.Config;
 using FlintLauncher.Core.IO;
+using FlintLauncher.Core.Migration;
 using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.ModPlatform.Modrinth;
 using FlintLauncher.Core.ModPlatform.Technic;
@@ -265,13 +266,16 @@ public sealed partial class InstanceImportTask(
 
     private void ProcessMultiMc()
     {
-        // the staged MultiMC import writes its fixups (fresh uuid, name, playtime reset)
-        // through the typed adapter — the committed folder is Flint format (instance.json);
-        // the cfg inside the zip, if any, stays untouched
+        var environment = Environment ?? throw new InvalidOperationException(
+            "InstanceTask requires SetParentEnvironment before execution.");
+
+        // the zip's instance.cfg becomes instance.json FIRST — the fixups below then write
+        // over the converted payload (iconKey, notes, gated overrides survive); the cfg
+        // itself stays untouched
+        LegacyInstanceConversion.ConvertOne(StagingPath, environment.ConfigInfo, environment.StateInfo);
+
         var instance = new NullInstance(
-            new InstanceJsonSettingsObject(StagingPath, Environment ?? throw new InvalidOperationException(
-                "InstanceTask requires SetParentEnvironment before execution.")),
-            StagingPath);
+            new InstanceJsonSettingsObject(StagingPath, environment), StagingPath);
 
         // reset time played on import... because packs.
         instance.ResetTimePlayed();
@@ -282,9 +286,11 @@ public sealed partial class InstanceImportTask(
         // set a new nice name
         instance.SetName(Name());
 
-        // if the icon was specified by user, use that. otherwise keep the pack's icon key
+        // if the icon was specified by user, use that; otherwise keep the pack's icon key
+        // (the C++ gate is !m_instIcon.isEmpty() — an unspecified icon is the empty string,
+        // and treating it as a choice would clobber the converted payload's icon)
         // (the icon file import itself needs the icon list layer and is not ported)
-        if (Icon != "default")
+        if (Icon.Length != 0)
         {
             instance.SetIconKey(Icon);
         }

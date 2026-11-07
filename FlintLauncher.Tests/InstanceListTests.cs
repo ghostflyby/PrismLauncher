@@ -48,7 +48,8 @@ public class InstanceListTests : IDisposable
             [new AbsolutePath(_instancesDir) / "instgroups.json"],
             launcherState: state);
 
-    private void MakeInstanceDir(string id, string instanceType = "OneSix", string? name = null)
+    private void MakeInstanceDir(string id, string instanceType = "OneSix", string? name = null,
+        params string[] extraLines)
     {
         var dir = Path.Combine(_instancesDir, id);
         Directory.CreateDirectory(dir);
@@ -58,7 +59,9 @@ public class InstanceListTests : IDisposable
             lines.Add("name=" + name);
         }
 
+        lines.AddRange(extraLines);
         File.WriteAllLines(Path.Combine(dir, "instance.cfg"), lines);
+        TestLegacyConversion.Convert(new AbsolutePath(_instancesDir));
     }
 
     // ---------------------------------------------------------------------------- scan
@@ -193,6 +196,8 @@ public class InstanceListTests : IDisposable
         var staging = stagingPath.Value.Value;
         File.WriteAllText(Path.Combine(staging, "instance.cfg"),
             "InstanceType=OneSix\nname=Uuid Staged\nuuid=abc123def456\n");
+        // the migration pass a cfg-only staging directory goes through before the commit
+        TestLegacyConversion.ConvertOne(new AbsolutePath(staging));
 
         var task = new StubInstanceTask { TargetDir = default, Group = "UuidGroup" };
         task.SetName("Uuid Staged");
@@ -685,6 +690,7 @@ public class InstanceListTests : IDisposable
         var dir = Path.Combine(_instancesDir, "notype");
         Directory.CreateDirectory(dir);
         File.WriteAllText(Path.Combine(dir, "instance.cfg"), "name=NoType\n");
+        TestLegacyConversion.Convert(new AbsolutePath(_instancesDir));
 
         var list = CreateList();
         list.LoadList();
@@ -697,8 +703,12 @@ public class InstanceListTests : IDisposable
     [Fact]
     public void TotalPlayTime_MigratedOnceOnFirstLoad()
     {
-        MakeInstanceDir("played", name: "P");
-        File.AppendAllText(Path.Combine(_instancesDir, "played", "instance.cfg"), "totalTimePlayed=3600\n");
+        var played = Path.Combine(_instancesDir, "played");
+        Directory.CreateDirectory(played);
+        File.WriteAllLines(Path.Combine(played, "instance.cfg"),
+            ["InstanceType=OneSix", "name=P", "totalTimePlayed=3600"]);
+        // the trio reaches launcher-state through the conversion (instance-state.json's seed)
+        TestLegacyConversion.Convert(new AbsolutePath(_instancesDir));
 
         // the migration hook is launcher-state.json's Playtime state (the former
         // TotalPlayTime/TotalPlayTimeMigrated settings keys retired)
@@ -738,6 +748,8 @@ public class InstanceListTests : IDisposable
         Assert.True(Directory.Exists(staging));
 
         File.WriteAllText(Path.Combine(staging, "instance.cfg"), "InstanceType=OneSix\nname=Staged Instance\n");
+        // the migration pass a cfg-only staging directory goes through before the commit
+        TestLegacyConversion.ConvertOne(new AbsolutePath(staging));
 
         var task = new StubInstanceTask { TargetDir = default, Group = "StagedGroup" };
         task.SetName("Staged Instance");
@@ -848,6 +860,7 @@ public class InstanceListTests : IDisposable
         Directory.CreateDirectory(otherDir);
         Directory.CreateDirectory(Path.Combine(otherDir, "in-new"));
         File.WriteAllText(Path.Combine(otherDir, "in-new", "instance.cfg"), "InstanceType=OneSix\nname=New\n");
+        TestLegacyConversion.ConvertOne(new AbsolutePath(Path.Combine(otherDir, "in-new")));
 
         list.SetInstanceDirs([new AbsolutePath(otherDir)]);
 
@@ -881,10 +894,8 @@ public class InstanceListTests : IDisposable
     public void LinkedInstances_DirnameImports_ConvertToUuids_AtLoadList()
     {
         MakeInstanceDir("base", name: "Base");
-        MakeInstanceDir("link", name: "Link");
         // Prism cfg: linkedImports in the QSettings string-list form ("base" = dirname)
-        File.AppendAllText(Path.Combine(_instancesDir, "link", "instance.cfg"),
-            "linkedInstances=base\n");
+        MakeInstanceDir("link", name: "Link", extraLines: ["linkedInstances=base"]);
 
         var list = CreateList();
         list.LoadList();
@@ -913,9 +924,7 @@ public class InstanceListTests : IDisposable
     public void LinkedInstances_UnresolvableReferences_StayVerbatim_UntilTheTargetAppears()
     {
         // the link names an instance that does not exist yet
-        MakeInstanceDir("late-link", name: "LateLink");
-        File.AppendAllText(Path.Combine(_instancesDir, "late-link", "instance.cfg"),
-            "linkedInstances=ghost\n");
+        MakeInstanceDir("late-link", name: "LateLink", extraLines: ["linkedInstances=ghost"]);
         var list = CreateList();
         list.LoadList();
 
@@ -949,12 +958,9 @@ public class InstanceListTests : IDisposable
         // a modern Prism file (ConfigVersion present — the QSettings codec splits the
         // comma list into the real 2-item list the linkedInstances feature always
         // ships with)
-        MakeInstanceDir("base", name: "Base");
-        File.AppendAllText(Path.Combine(_instancesDir, "base", "instance.cfg"),
-            "uuid=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n");
-        MakeInstanceDir("link", name: "Link");
-        File.AppendAllText(Path.Combine(_instancesDir, "link", "instance.cfg"),
-            "ConfigVersion=1.3\nlinkedInstances=base, aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n");
+        MakeInstanceDir("base", name: "Base", extraLines: ["uuid=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]);
+        MakeInstanceDir("link", name: "Link",
+            extraLines: ["ConfigVersion=1.3", "linkedInstances=base, aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]);
 
         var list = CreateList();
         list.LoadList();

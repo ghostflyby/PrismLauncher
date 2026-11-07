@@ -39,17 +39,15 @@ public static class InstanceIniImporter
     /// file yields an empty payload (the record defaults take over through the fold).</summary>
     public static InstanceConfigFile Import(AbsolutePath iniPath)
     {
-        var result = new InstanceConfigFile();
-        if (!iniPath.ExistsFile())
-        {
-            return result;
-        }
-
         var ini = new IniFile();
-        if (!ini.LoadFile(iniPath))
-        {
-            return result;
-        }
+        return ini.LoadFile(iniPath) ? Import(ini) : new InstanceConfigFile();
+    }
+
+    /// <summary>The same import over an already-parsed file (the conversion pass parses once
+    /// and reads the time trio out of the same document).</summary>
+    public static InstanceConfigFile Import(IniFile ini)
+    {
+        var result = new InstanceConfigFile();
 
         // pass 1: collect the gate values — from the Override* keys ONLY, scanning the whole
         // file (INI keys are unique, so a full scan has no first/last ambiguity; the key

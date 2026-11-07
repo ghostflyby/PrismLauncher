@@ -175,7 +175,7 @@ public class SettingsObjectTests : IDisposable
     }
 
     [Fact]
-    public void DualTrack_CfgImport_ConvertsOnFirstWrite()
+    public void Legacy_Cfg_Converts_Eagerly_The_Cfg_Stays_Unwritten()
     {
         (_root / "instance.cfg").WriteAllLines(
         [
@@ -186,17 +186,20 @@ public class SettingsObjectTests : IDisposable
             "MinecraftWinWidth=1280",
         ]);
 
-        // read-only: the import resolves in memory, nothing materializes
+        // the migration pass materializes the instance layer before the store reads it
+        TestLegacyConversion.ConvertOne(_root);
         var settings = Settings();
         settings.RegisterSetting("name", "Unnamed Instance");
         settings.RegisterSetting("notes", "");
         Assert.Equal("Legacy", Variant.AsString(settings.Get("name")));
-        Assert.False(JsonPath.ExistsFile());
-
-        // the first write converts (uuid carried over verbatim — the addressing chain)
-        settings.Set("notes", "now flint");
         Assert.True(JsonPath.ExistsFile());
         Assert.Contains("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", JsonPath.ReadAllText());
         Assert.Contains("1280", JsonPath.ReadAllText());
+
+        // writes update instance.json; the cfg stays read-only forever
+        var cfgBefore = (_root / "instance.cfg").ReadAllText();
+        settings.Set("notes", "now flint");
+        Assert.Contains("now flint", JsonPath.ReadAllText());
+        Assert.Equal(cfgBefore, (_root / "instance.cfg").ReadAllText());
     }
 }
