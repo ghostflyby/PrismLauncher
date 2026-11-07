@@ -549,8 +549,18 @@ public sealed class LaunchController(ILoggerFactory loggerFactory, AuthEndpoints
         }
     }
 
-    /// <summary>Port of onProgressRequested(): the progress dialog collapses into a proceed().</summary>
-    private void OnProgressRequested(LaunchStep step) => _launcher?.Proceed();
+    /// <summary>Port of onProgressRequested(): the progress dialog collapses into a proceed()
+    /// — but only when the launch is self-driving. LaunchTask raises RequestProgress the
+    /// moment a step parks at the gate, so an unconditional proceed here would open the
+    /// API's proceed gate (AutoProceed=false, the client drives it) before the client ever
+    /// called in, turning the parked "waiting" state into a race.</summary>
+    private void OnProgressRequested(LaunchStep step)
+    {
+        if (AutoProceed)
+        {
+            _launcher?.Proceed();
+        }
+    }
 
     // -------------------------------------------------------------------------------- abort
 

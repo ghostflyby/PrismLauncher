@@ -44,6 +44,7 @@ public class RootMovedTests : IDisposable
         var space = new DirectorySpace();
         space.TenantMoved += (oldDir, newDir) =>
         {
+            movedEvents.Add((oldDir, newDir));
             if (oldDir == icons.Path)
             {
                 pool.SetIconsDir(newDir); // the host wiring's re-point
