@@ -381,19 +381,11 @@ public sealed class World
         return FileOps.DeletePath(new AbsolutePath(ContainerPath));
     }
 
-    /// <summary>Port of World::setSize.</summary>
-    /// <summary>Port of World::operator== — deliberately weak (validity + folder name).</summary>
-    public override bool Equals(object? obj)
-    {
-        return obj is World other && IsValid == other.IsValid && FolderName == other.FolderName;
-    }
-
-    // the hash follows the deliberately weak equality (validity + folder name); both
-    // members are mutable by design (readFromFS/rename flip them), same lifetime as the
-    // C++ hash usage — two mutable members on the line, hence two disable-onces
-    // ReSharper disable once NonReadonlyMemberInGetHashCode
-    // ReSharper disable once NonReadonlyMemberInGetHashCode
-    public override int GetHashCode() => HashCode.Combine(IsValid, FolderName);
+    // The C++ operator== (deliberately weak: validity + folder name) has no consumer in the
+    // headless port — nothing compares or hashes World instances, so the pair is not ported:
+    // the identity members stay mutable by C++ parity (repath/rename/replace flip them), and
+    // a hash over mutable identity silently loses the key on rename. A future consumer
+    // designs the identity (readonly key, or re-key on rename) before comparing.
 
     // ------------------------------------------------------------------ internals
 
