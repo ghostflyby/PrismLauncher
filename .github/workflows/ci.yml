@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+# A new push to the same ref supersedes the in-flight CI run: the build/test
+# matrix only needs to check the latest commit.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  build-test:
+    name: Build & Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-24.04, windows-2025, macos-26 ]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+          cache: true
+          cache-dependency-path: '**/*.csproj'
+
+      # FlintLauncher.Core builds the NewLaunch/NewLaunchLegacy jars with javac/jar
+      # on every build (BeforeTargets: PrepareForBuild) and embeds them, and the
+      # launch tests exercise the embedded jars, so the targets cannot be skipped
+      # (FlintSkipJarBuild would silently produce a jar-less assembly). Pin a JDK
+      # instead of relying on whatever the runner happens to have on PATH:
+      # temurin 21 still accepts the targets' --release 8.
+      - name: Setup JDK
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Restore
+        run: dotnet restore FlintLauncher.slnx
+
+      - name: Build
+        run: dotnet build FlintLauncher.slnx --no-restore --configuration Release
+
+      - name: Format
+        run: dotnet format FlintLauncher.slnx --verify-no-changes --no-restore
+
+      - name: Test
+        # MTP mode: the xunit v3 test assembly is a self-executing
+        # Microsoft.Testing.Platform app, so the VSTest-era --logger option no
+        # longer exists. --report-trx (provided by
+        # Microsoft.Testing.Extensions.TrxReport, referenced by the test
+        # project) writes the .trx into TestResults.
+        run: dotnet test FlintLauncher.slnx --no-build --configuration Release --report-trx --results-directory TestResults
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: test-results-${{ matrix.os }}
+          path: TestResults
+          if-no-files-found: ignore
