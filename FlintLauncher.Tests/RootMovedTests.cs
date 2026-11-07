@@ -67,4 +67,45 @@ public class RootMovedTests : IDisposable
         Assert.Equal(icons.Path, movedEvents[0].Old);
         Assert.Equal(renamed, movedEvents[0].New);
     }
+
+    // The production recovery chain, WITHOUT the test-driven RearmAll: the rename must
+    // surface through the watcher's own pipeline (the FSW loss report — or, where the
+    // platform keeps delivering on the renamed inode, whatever recovery the watch layer
+    // performs on its own) and re-point the tenant. Whether each platform reports a rename
+    // of the watched root itself is exactly what this test settles; a platform that never
+    // reports it leaves the watch silently stuck on the dead path, which is the gap a
+    // production-side sweep would close.
+    [Fact]
+    public async Task RenamedRoot_TheProductionChain_FiresMoved_WithoutARearm()
+    {
+        if (!OperatingSystem.IsLinux())
+        {
+            // the anchor re-derives paths only on Linux (/proc/self/fd); Windows recovers at
+            // the same path through backoff and macOS has no safe re-derivation channel —
+            // see the sync test above
+            return;
+        }
+
+        var icons = MaterializedDirectory.Ensure(_root / "icons")!;
+        (icons.Path / "keep.png").WriteAllBytes([1, 2, 3]);
+        var pool = new IconPool(icons);
+
+        var moved = new TaskCompletionSource<(AbsolutePath Old, AbsolutePath New)>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        using var space = new DirectorySpace();
+        space.TenantMoved += (oldDir, newDir) => moved.TrySetResult((oldDir, newDir));
+        space.Register(icons, pool.Rescan);
+        pool.AttachWatcher(space);
+        space.Pulse(icons.Path);
+        Assert.True(pool.IconFileExists("keep"));
+
+        var renamed = _root / "icons-renamed";
+        Directory.Move(icons.Path.Value, renamed.Value);
+
+        var winner = await Task.WhenAny(moved.Task, Task.Delay(TimeSpan.FromSeconds(10)));
+        Assert.True(winner == moved.Task,
+            "the rename never surfaced through the watch layer within 10s — production recovery is blind to it");
+        Assert.Equal(renamed, pool.IconsDir);
+        Assert.True(pool.IconFileExists("keep"));
+    }
 }
