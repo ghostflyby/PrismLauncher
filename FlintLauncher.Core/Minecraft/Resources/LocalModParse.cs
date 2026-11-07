@@ -479,15 +479,15 @@ public static class ModUtils
 
         details.IconFile = !string.IsNullOrEmpty(file.LogoFile) ? file.LogoFile : modsTable.LogoFile ?? "";
 
-        void ParseDep(IReadOnlyList<ModsTomlDependency>? dependencies)
+        void ParseDep(IReadOnlyList<ModsTomlDependency>? deps)
         {
             string[] ignoreModIds = ["", "forge", "neoforge", "minecraft"];
-            if (dependencies is null)
+            if (deps is null)
             {
                 return;
             }
 
-            foreach (var dep in dependencies)
+            foreach (var dep in deps)
             {
                 var modId = dep.ModId ?? "";
                 if (ignoreModIds.Contains(modId))

@@ -64,7 +64,7 @@ public static class ArchiveDownloadTask
         {
             await action.DownloadAsync(progress, cancellationToken).ConfigureAwait(false);
 
-            ExtractJava(fullPath.Value, finalPath, progress);
+            ExtractJava(fullPath.Value, finalPath);
         }
         finally
         {
@@ -82,7 +82,7 @@ public static class ArchiveDownloadTask
         }
     }
 
-    private static void ExtractJava(string input, AbsolutePath finalPath, IProgress<TaskProgress>? progress)
+    private static void ExtractJava(string input, AbsolutePath finalPath)
     {
         // determine which top-level folder to strip (C++: files[0].split('/').value(0));
         // null = unreadable archive, "" = readable but empty

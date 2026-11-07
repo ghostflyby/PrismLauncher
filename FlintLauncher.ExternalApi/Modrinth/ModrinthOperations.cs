@@ -236,6 +236,9 @@ public readonly record struct ModrinthCategoriesQuery(ModrinthClientOptions Opti
 
 /// <summary>GET /search — the search envelope: the page offset, the free text, the sort
 /// index and the facet groups (each group OR-s its values, the groups AND together).</summary>
+// ProjectType rides the wire contract for callers that need it; the request builder
+// derives the facet itself
+// ReSharper disable NotAccessedPositionalProperty.Global
 public readonly record struct ModrinthSearchQuery(
     ModrinthClientOptions Options,
     int Offset,
@@ -244,6 +247,7 @@ public readonly record struct ModrinthSearchQuery(
     string ProjectType,
     IReadOnlyList<IReadOnlyList<string>> Facets)
     : IApiOperation<ModrinthSearchResults>
+// ReSharper restore NotAccessedPositionalProperty.Global
 {
     public HttpRequestMessage CreateRequest()
     {

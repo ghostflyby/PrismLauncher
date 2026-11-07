@@ -74,7 +74,6 @@ public static class FlamePackExportTask
 
     private sealed class HashInfo
     {
-        public string Name { get; init; } = "";
         public string Path { get; init; } = "";
         public bool Enabled { get; init; }
         public bool IsMod { get; init; }
@@ -138,7 +137,6 @@ public static class FlamePackExportTask
                     var hash = HashUtils.HashFile(file, Algorithm.Murmur2);
                     pendingHashes[hash] = new HashInfo
                     {
-                        Name = relative,
                         Path = file,
                         Enabled = relative.EndsWith(".zip", StringComparison.Ordinal),
                         IsMod = false,
@@ -178,7 +176,6 @@ public static class FlamePackExportTask
                     var modHash = HashUtils.HashFile(file, Algorithm.Murmur2);
                     pendingHashes[modHash] = new HashInfo
                     {
-                        Name = mod.Name,
                         Path = file,
                         Enabled = mod.Enabled,
                         IsMod = true,

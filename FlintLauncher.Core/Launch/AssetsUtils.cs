@@ -93,6 +93,8 @@ public sealed class AssetObject
 /// <summary>Port of AssetsIndex.</summary>
 public sealed class AssetsIndex
 {
+    // deserialized for wire parity (the index document's "id" field)
+    // ReSharper disable once UnusedAutoPropertyAccessor.Global
     public string Id { get; set; } = "";
 
     public SortedDictionary<string, AssetObject> Objects { get; } = new(StringComparer.Ordinal);

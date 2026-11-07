@@ -602,6 +602,11 @@ public class CoverageFixLaunchJoinApiTests
             var taskId = JsonDocument.Parse(await launch.Content.ReadAsStringAsync())
                 .RootElement.GetProperty("taskId").GetString();
             Assert.NotNull(taskId);
+            // two gates per API launch: the instance-update progress gate first, then the
+            // launch-confirmation gate
+            await PollTaskState(client, taskId, "waiting", TimeSpan.FromSeconds(30));
+            Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync(
+                $"/api/v1/tasks/{taskId}/proceed", new { })).StatusCode);
             await PollTaskState(client, taskId, "waiting", TimeSpan.FromSeconds(30));
             Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync(
                 $"/api/v1/tasks/{taskId}/proceed", new { })).StatusCode);
@@ -632,6 +637,9 @@ public class CoverageFixLaunchJoinApiTests
             var taskId2 = JsonDocument.Parse(await launch2.Content.ReadAsStringAsync())
                 .RootElement.GetProperty("taskId").GetString();
             Assert.NotNull(taskId2);
+            await PollTaskState(client, taskId2, "waiting", TimeSpan.FromSeconds(30));
+            Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync(
+                $"/api/v1/tasks/{taskId2}/proceed", new { })).StatusCode);
             await PollTaskState(client, taskId2, "waiting", TimeSpan.FromSeconds(30));
             Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync(
                 $"/api/v1/tasks/{taskId2}/proceed", new { })).StatusCode);

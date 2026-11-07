@@ -35,6 +35,8 @@ public sealed class LauncherStateStore
     /// edited in place.</summary>
     public LauncherState Current { get; private set; }
 
+    // _file is readonly — the lock below guards persistence, not the reference
+    // ReSharper disable once InconsistentlySynchronizedField
     public AbsolutePath FilePath => _file.FilePath;
 
     /// <summary>The fresh-install default (schema version 1).</summary>
@@ -49,6 +51,8 @@ public sealed class LauncherStateStore
     /// <see cref="Evolve"/>. Fluent's own writes always round-trip every member; the fold is
     /// the defense for older-schema payloads and hand-edited files.</summary>
     private LauncherState Load() =>
+        // _file is readonly — the lock below guards persistence, not the reference
+        // ReSharper disable once InconsistentlySynchronizedField
         _file.LoadEvolved(CurrentDefault, Evolve, MergeOverDefault);
 
     /// <summary>The fold: normalizes the inner scalars of the sub-records (the materializing

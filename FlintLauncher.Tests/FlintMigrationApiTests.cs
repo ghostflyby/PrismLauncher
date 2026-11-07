@@ -3,12 +3,6 @@
 
 using System.Net;
 using System.Text.Json;
-using FlintLauncher.Core.Config;
-using FlintLauncher.Core.Instances;
-using FlintLauncher.Core.IO;
-using FlintLauncher.Core.Migration;
-using FlintLauncher.Web;
-using TruePath;
 using Xunit;
 
 namespace FlintLauncher.Tests;

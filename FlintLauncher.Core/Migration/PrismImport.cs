@@ -355,9 +355,6 @@ public sealed class PrismImportTask
         // like the C++ ResolveSymlinks walk), directory links are not descended into
         return FileTransfer.EnumerateFilesDeep(dir);
     }
-
-    private static string Truncate(string relative) =>
-        relative.Length > 50 ? relative[..20] + "…" + relative[^29..] : relative;
 }
 
 /// <summary>Detects candidate Prism-family data directories at the per-OS default locations.</summary>

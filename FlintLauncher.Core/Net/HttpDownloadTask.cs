@@ -367,14 +367,14 @@ public sealed class HttpDownloadTask(
         // bookkeeping never fired — the new regression test pins the fix)
         var wroteAnyData = _wroteAnyData;
         CancelWriting();
-        FinalizeCacheEntry(statusCode, headers, wroteAnyData);
+        FinalizeCacheEntry(headers, wroteAnyData);
         return true;
     }
 
     /// <summary>Port of MetaCacheSink::finalizeCache (the cached plane's bookkeeping): md5
     /// only when data was written, etag/last-modified/max-age/Age, then UpdateEntry. Always
     /// succeeds; a no-op for plain file targets.</summary>
-    private void FinalizeCacheEntry(int statusCode, System.Net.Http.Headers.HttpResponseHeaders headers,
+    private void FinalizeCacheEntry(System.Net.Http.Headers.HttpResponseHeaders headers,
         bool wroteAnyData)
     {
         if (CachedEntry is not { } entry)

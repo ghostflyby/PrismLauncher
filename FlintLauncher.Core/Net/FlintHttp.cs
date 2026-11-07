@@ -74,9 +74,15 @@ public static class FlintHttp
                 }
                 catch (OperationCanceledException) when (window.TimedOut)
                 {
+                    // the self-scheduled timeout is this operation's own semantic — a domain
+                    // error, not a swallowed cancellation
                     throw new FlintHttpException(window.TimeoutMessage);
                 }
-                catch (Exception)
+                // a body read that fails contributes an empty body — the status line below
+                // is the message. The caller's own cancellation (abort) is NOT caught: wrap
+                // non-OCE, propagate OCE.
+                // ReSharper disable once EmptyGeneralCatchClause
+                catch (Exception e) when (e is not OperationCanceledException)
                 {
                 }
 

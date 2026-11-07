@@ -206,7 +206,10 @@ public sealed partial class FlameCreationTask : InstanceTask
 
         if (!PromptForUntrustedMods())
         {
-            throw new InvalidOperationException("The pack contains files from untrusted sources:\n" + string.Join("\n", UntrustedMods));
+            // the listing renders with '/' separators on every platform — the message is
+            // user-facing (dialog/paste) and the zip-relative shape is the stable form
+            throw new InvalidOperationException("The pack contains files from untrusted sources:\n" +
+                string.Join("\n", UntrustedMods.Select(mod => mod.Value.Replace('\\', '/'))));
         }
 
         string loaderType = "";

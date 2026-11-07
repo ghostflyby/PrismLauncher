@@ -325,9 +325,13 @@ public sealed class IndexedVersion
 /// and status members are not ported).</summary>
 public sealed class ExtraPackData
 {
+    // deserialized for wire parity with the metadata documents; the headless port never
+    // renders them
+    // ReSharper disable UnusedAutoPropertyAccessor.Global
     public string? IssuesUrl { get; set; }
     public string? SourceUrl { get; set; }
     public string? WikiUrl { get; set; }
+    // ReSharper restore UnusedAutoPropertyAccessor.Global
 
     public string? Body { get; set; }
 }

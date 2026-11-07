@@ -94,20 +94,27 @@ public class FlintPathsTests : IDisposable
     [Fact]
     public void FromRoots_Keeps_The_Five_Roots_Independently()
     {
+        // the roots are compared as the AbsolutePath instances they came from — a literal
+        // POSIX string would not survive windows normalization
+        var config = new AbsolutePath("/c");
+        var data = new AbsolutePath("/d");
+        var store = new AbsolutePath("/s");
+        var cache = new AbsolutePath("/k");
+        var state = new AbsolutePath("/st");
         var paths = new FlintPaths()
         {
-            ConfigRoot = new AbsolutePath("/c"),
-            DataRoot = new AbsolutePath("/d"),
-            StoreRoot = new AbsolutePath("/s"),
-            CacheRoot = new AbsolutePath("/k"),
-            StateRoot = new AbsolutePath("/st"),
+            ConfigRoot = config,
+            DataRoot = data,
+            StoreRoot = store,
+            CacheRoot = cache,
+            StateRoot = state,
         };
 
-        Assert.Equal("/c", paths.ConfigRoot.Value);
-        Assert.Equal("/d", paths.DataRoot.Value);
-        Assert.Equal("/s", paths.StoreRoot.Value);
-        Assert.Equal("/k", paths.CacheRoot.Value);
-        Assert.Equal("/st", paths.StateRoot.Value);
+        Assert.Equal(config, paths.ConfigRoot);
+        Assert.Equal(data, paths.DataRoot);
+        Assert.Equal(store, paths.StoreRoot);
+        Assert.Equal(cache, paths.CacheRoot);
+        Assert.Equal(state, paths.StateRoot);
     }
 
     // ------------------------------------------------------------------- logs anchor

@@ -92,8 +92,7 @@ public sealed class ComponentUpdateTask(ComponentUpdateTask.Mode mode, NetMode n
 
     // ---------------------------------------------------------------- loading
 
-    private LoadResult LoadComponent(Component component, out Func<CancellationToken, Task>? loadTask,
-        NetMode netmode)
+    private LoadResult LoadComponent(Component component, out Func<CancellationToken, Task>? loadTask)
     {
         loadTask = null;
         if (component.Loaded)
@@ -181,7 +180,7 @@ public sealed class ComponentUpdateTask(ComponentUpdateTask.Mode mode, NetMode n
             // FIXME upstream: to do this right, the version lists would be loaded first and the
             // versions decided during dependency resolution; the Launch/Resolution split below
             // is disabled upstream (#if 0) as well.
-            var singleResult = LoadComponent(component, out var loadTask, netmode);
+            var singleResult = LoadComponent(component, out var loadTask);
             if (singleResult == LoadResult.LoadedLocal)
             {
                 component.UpdateCachedData();

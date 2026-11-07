@@ -23,6 +23,9 @@ public sealed class LegacyFtbModpack
     public string Description { get; init; } = "";
     public string Author { get; set; } = "";
     public List<string> OldVersions { get; } = [];
+
+    // deserialized for xml parity with the legacy FTB pack file
+    // ReSharper disable once UnusedAutoPropertyAccessor.Global
     public string CurrentVersion { get; init; } = "";
     public string McVersion { get; init; } = "";
     public string Mods { get; init; } = "";

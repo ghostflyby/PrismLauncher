@@ -107,6 +107,12 @@ public sealed class NbtList : NbtTag, IReadOnlyList<NbtTag>
         return true;
     }
 
+    // Content equality/hash is libnbt++ tag_list parity (NbtTagEquals), pinned by the
+    // NbtTests HashSet dedupe. The mutability this rule flags is build-phase only:
+    // NbtReader types the list through Reset and grows it through Add; after parsing, the
+    // tree is read-only. Hash consumers must hash fully built lists and re-key on any
+    // post-build mutation; production has no hash consumers.
+    // ReSharper disable once NonReadonlyMemberInGetHashCode
     public override int GetHashCode()
     {
         var hash = new HashCode();

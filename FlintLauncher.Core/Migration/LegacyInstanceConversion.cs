@@ -14,7 +14,10 @@ public static class LegacyInstanceConversion
 {
     /// <summary>What the pass did: how many instance directories converted, how many failed
     /// (an IO failure on one directory never stops the walk — the next pass retries it).</summary>
+    // the counts surface with the migration API/UI; the headless port only composes them
+    // ReSharper disable NotAccessedPositionalProperty.Global
     public sealed record Result(int Converted, int Failed)
+    // ReSharper restore NotAccessedPositionalProperty.Global
     {
         public static readonly Result None = new(0, 0);
     }

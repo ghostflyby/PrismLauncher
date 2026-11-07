@@ -165,12 +165,14 @@ public sealed record FlintPaths
                                                          Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)) /
                                                      "Library" / "Application Support" / "Flint";
 
-    // TODO: fix the xdg fallback logic
     private static AbsolutePath XdgBase(string envVar)
     {
+        // XDG Base Directory: $XDG_*_HOME counts only as an absolute path; unset,
+        // empty, or relative values fall back to $HOME, whose child chain the call
+        // sites spell out (.config, .local/share, .cache, .local/state).
         var env = Environment.GetEnvironmentVariable(envVar);
-        return string.IsNullOrWhiteSpace(env)
-            ? new AbsolutePath()
+        return string.IsNullOrWhiteSpace(env) || !Path.IsPathRooted(env)
+            ? new AbsolutePath(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile))
             : new AbsolutePath(env);
     }
 

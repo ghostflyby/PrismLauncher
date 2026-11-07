@@ -6,7 +6,10 @@ using TruePath;
 namespace FlintLauncher.Core.Launch;
 
 /// <summary>The C++ GUI touchpoints of the launch pipeline, as injected hooks instead of
-/// static fields. All nullable: unset means the headless default (skip).</summary>
+/// static fields. All nullable: unset means the headless default (skip). The seams are
+/// wired by the GUI host (and tests); the headless port reads only some of them, hence
+/// the accessor suppression.</summary>
+// ReSharper disable UnusedAutoPropertyAccessor.Global
 public sealed record LaunchUiHooks
 {
     /// <summary>CloseAfterLaunch mode: the game logged "Setting user ..." — close the launcher

@@ -34,10 +34,14 @@ public static class FlintMigration
 
     /// <summary>What the run did (one entry per half; a half that threw reports its idle
     /// outcome — the next run retries it).</summary>
+    // the three half-results surface with the migration API/UI; the headless port only
+    // composes them
+    // ReSharper disable NotAccessedPositionalProperty.Global
     public sealed record Result(
         FlintLegacyMigration.Result Remount,
         FlintConfigImporter.ImportResult Config,
         LegacyInstanceConversion.Result Instances)
+    // ReSharper restore NotAccessedPositionalProperty.Global
     {
         public static readonly Result None = new(
             FlintLegacyMigration.Result.Skipped, FlintConfigImporter.ImportResult.Idle,

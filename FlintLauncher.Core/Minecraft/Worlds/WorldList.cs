@@ -69,7 +69,6 @@ public sealed class WorldList : IReadOnlyList<World>
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
-    private DirectorySpace? _watchSpace;
     private int _reconcileRunning;
 
     /// <summary>Opts the list into watcher-driven refresh (the C++ WorldList watched its
@@ -78,7 +77,6 @@ public sealed class WorldList : IReadOnlyList<World>
     /// demand-driven Update().</summary>
     public void AttachWatcher(DirectorySpace space)
     {
-        _watchSpace = space;
         Update();
         if (MaterializedDirectory.Wrap(Dir) is { } materialized)
         {

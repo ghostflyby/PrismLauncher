@@ -288,7 +288,11 @@ public class FlintApiIntegrationTests
         var uuid = entry.GetProperty("uuid").GetString();
         Assert.NotNull(uuid);
         Assert.False(string.IsNullOrEmpty(uuid));
-        Assert.NotEqual(0L, entry.GetProperty("inode").GetInt64()); // unix stat; Windows would be 0
+        // unix stat; windows has no inode and reports 0
+        if (!OperatingSystem.IsWindows())
+        {
+            Assert.NotEqual(0L, entry.GetProperty("inode").GetInt64());
+        }
 
         // detail -----------------------------------------------------------------------
         var detail = JsonDocument.Parse(
@@ -629,13 +633,17 @@ public class FlintApiIntegrationTests
                     await second.Content.ReadAsStringAsync())
                 .RootElement.GetProperty("error").GetProperty("code").GetString());
 
-            // AutoProceed is false for API launches: the task parks in "waiting" --------
-            var waiting = await PollTaskState(client, taskId, "waiting", TimeSpan.FromSeconds(30));
-            Assert.Equal("launch", waiting.GetProperty("kind").GetString());
-
-            // premature abort endpoint exists; proceed opens the gate -------------------
+            // AutoProceed is false for API launches: the task parks once per gate — the
+            // instance-update progress gate first, then the launch-confirmation gate
+            var updateGate = await PollTaskState(client, taskId, "waiting", TimeSpan.FromSeconds(30));
+            Assert.Equal("launch", updateGate.GetProperty("kind").GetString());
             var proceed = await client.PostAsJsonAsync($"/api/v1/tasks/{taskId}/proceed", new { });
             proceed.EnsureSuccessStatusCode();
+
+            var launchGate = await PollTaskState(client, taskId, "waiting", TimeSpan.FromSeconds(30));
+            Assert.Equal("launch", launchGate.GetProperty("kind").GetString());
+            var proceed2 = await client.PostAsJsonAsync($"/api/v1/tasks/{taskId}/proceed", new { });
+            proceed2.EnsureSuccessStatusCode();
 
             var done = await PollTaskState(client, taskId, "succeeded", TimeSpan.FromSeconds(30));
 
@@ -968,6 +976,7 @@ public class ApiAuthTests
             await app.StartAsync();
             // one-shot request against the hosted stub; a single throwaway client here is
             // the honest shape (IHttpClientFactory is not registered in the test host)
+            // ReSharper disable once ShortLivedHttpClient
             using var client = new HttpClient();
             client.BaseAddress = new Uri(app.Urls.First());
             Assert.True((await client.GetAsync("/api/v1/instances")).IsSuccessStatusCode);

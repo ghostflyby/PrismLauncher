@@ -184,7 +184,7 @@ public class FlintConfigStoreTests : IDisposable
             AbsolutePath storeRoot = _dir / "store";
             AbsolutePath cacheRoot = _dir / "cache";
             AbsolutePath stateRoot = _dir / "state";
-            return (FlintPaths)new()
+            return new FlintPaths()
             {
                 ConfigRoot = _dir,
                 DataRoot = dataRoot,

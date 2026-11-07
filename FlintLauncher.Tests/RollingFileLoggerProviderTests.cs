@@ -50,6 +50,8 @@ public class RollingFileLoggerProviderTests : IDisposable
         using (var factory = LoggerFactory.Create(builder =>
                {
                    builder.SetMinimumLevel(LogLevel.Information);
+                   // the factory-using closes first — the provider outlives it by design
+                   // ReSharper disable once AccessToDisposedClosure
                    builder.AddProvider(provider);
                }))
         {
@@ -61,8 +63,12 @@ public class RollingFileLoggerProviderTests : IDisposable
         Assert.Equal("gen1\n", File.ReadAllText(PathOf(2)));
         Assert.Equal("gen3\n", File.ReadAllText(PathOf(4)));
         Assert.False(File.Exists(Path.Combine(_dir, "Flint-5.log")));
-        // a fresh Flint-0.log received the formatted line
-        var fresh = File.ReadAllText(PathOf(0));
+        // a fresh Flint-0.log received the formatted line — read through the writer's
+        // sharing (File.ReadAllText's FileShare.Read conflicts with the open writer)
+        using var freshStream = new FileStream(PathOf(0), FileMode.Open, FileAccess.Read,
+            FileShare.ReadWrite | FileShare.Delete);
+        using var freshReader = new StreamReader(freshStream);
+        var fresh = freshReader.ReadToEnd();
         Assert.Contains("hello file", fresh);
         Assert.Contains("[test.category]", fresh);
         Assert.Contains("[info]", fresh);

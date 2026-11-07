@@ -45,8 +45,11 @@ public class ImgurTests : IDisposable
     [Fact]
     public void ScreenShot_FileInfo_Semantics()
     {
-        var shot = new ScreenShot(new AbsolutePath("/instances/a/screens/2026-09-13_10.11.12.png"));
-        Assert.Equal("/instances/a/screens/2026-09-13_10.11.12.png", shot.FilePath.Value);
+        // compared against the input path itself — a literal POSIX string would not
+        // survive windows normalization
+        var path = new AbsolutePath("/instances/a/screens/2026-09-13_10.11.12.png");
+        var shot = new ScreenShot(path);
+        Assert.Equal(path.Value, shot.FilePath.Value);
         // QFileInfo::fileName()
         Assert.Equal("2026-09-13_10.11.12.png", shot.FileName());
         // QFileInfo::baseName(): everything before the first '.'

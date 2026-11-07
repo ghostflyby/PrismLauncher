@@ -37,21 +37,6 @@ public class JavaDownloadTests : IDisposable
 
     private static string Sha1(byte[] data) => Convert.ToHexString(SHA1.HashData(data)).ToLowerInvariant();
 
-    /// <summary>Runs a download and returns the failure message, asserting it succeeded when
-    /// <paramref name="expectSuccess"/> is set (the reason is then empty).</summary>
-    private static async Task<string> RunDownloadAsync(Task download, bool expectSuccess)
-    {
-        if (expectSuccess)
-        {
-            await download;
-            return "";
-        }
-
-        var failure = await Record.ExceptionAsync(() => download);
-        Assert.NotNull(failure);
-        return failure.Message;
-    }
-
     // ------------------------------------------------------------------ archive (zip)
 
     [Fact]

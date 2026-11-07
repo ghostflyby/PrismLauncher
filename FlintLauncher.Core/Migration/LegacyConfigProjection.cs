@@ -164,9 +164,14 @@ public static class LegacyConfigProjection
     {
         var current = GetMember(raw, domain, member);
         var defaultValue = GetMember(Defaults, domain, member);
-        return current is EnvMap map && defaultValue is EnvMap defaultMap
-            ? map.OrderBy(entry => entry.Key).SequenceEqual(defaultMap.OrderBy(entry => entry.Key))
-            : Equals(current, defaultValue);
+        if (current is not EnvMap map || defaultValue is not EnvMap defaultMap)
+        {
+            return Equals(current, defaultValue);
+        }
+
+        // dictionary-content equality, spelled out (no boxed KeyValuePair default comparer)
+        return map.Count == defaultMap.Count &&
+               map.All(entry => defaultMap.TryGetValue(entry.Key, out var value) && value == entry.Value);
     }
 
     /// <summary>The INI value for one key: the primary spelling first (when the file carries
@@ -281,7 +286,7 @@ public static class LegacyConfigProjection
                 : RootProperty(parameter.Name!)?.GetValue(raw);
         }
 
-        return (FlintConfigFile)constructor.Invoke(arguments)!;
+        return (FlintConfigFile)constructor.Invoke(arguments);
     }
 
     private static PropertyInfo DomainProperty(string domain) =>

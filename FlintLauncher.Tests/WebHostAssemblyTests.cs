@@ -31,7 +31,12 @@ public class WebHostAssemblyTests
                 WebHostBuilder.BuildWebApplication(["--home-dir", home]));
 
             Assert.NotNull(crash); // fail-fast preserved: no half-assembled host, no silent start
-            var log = File.ReadAllText(Path.Combine(home, "state", "logs", "Flint-0.log"));
+            // the crash-path provider is never disposed, so its writer holds the file —
+            // the read must opt into the writer's sharing or windows refuses the open
+            using var logStream = new FileStream(Path.Combine(home, "state", "logs", "Flint-0.log"),
+                FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            using var logReader = new StreamReader(logStream);
+            var log = logReader.ReadToEnd();
             Assert.Contains("runtime assembly failed", log);
             Assert.Contains("NullReferenceException", log);
         }

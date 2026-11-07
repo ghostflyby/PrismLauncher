@@ -282,17 +282,9 @@ public class WorldTests : IDisposable
         Assert.True(world.Destroy());
     }
 
-    [Fact]
-    public void WeakEquality_ComparesValidityAndFolderName()
-    {
-        var dir = MakeFolderWorld("Same");
-        var a = new World(dir);
-        var b = new World(dir);
-        Assert.Equal(a, b);
-
-        var other = MakeFolderWorld("Other", name: "Different Name");
-        Assert.NotEqual(a, new World(other));
-    }
+    // the weak equality (validity + folder name) is not ported: the C++ operator== has no
+    // consumer in the headless port, and a hash over the mutable identity members would
+    // lose the key on rename (see the note on World)
 
     // ----------------------------------------------------------------- WorldList
 

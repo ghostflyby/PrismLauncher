@@ -131,7 +131,8 @@ public class InstanceList : INotifyCollectionChanged, INotifyPropertyChanged, IR
     /// discovery, lifecycle and watching — it deliberately knows nothing about the wider
     /// data layout (it stays with the composition root and the instances):
     /// the group persistence arrives as its two config objects, and the launch-pipeline
-    /// half reaches the instances through <paramref name="launchServices"/>.</summary>
+    /// half reaches the instances through <paramref name="environment"/> and the optional
+    /// <paramref name="storeRoot"/>/<paramref name="ui"/> hooks.</summary>
     /// <param name="instanceDirs">The materialized instance roots (Ensure semantics —
     /// missing roots are created; the first one is the primary dir).</param>
     /// <param name="environment">The typed instance-layer environment. Required:

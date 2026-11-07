@@ -242,6 +242,9 @@ internal sealed class StubLegacyFtbServer : IDisposable
 
     public string ModpacksXml { get; set; } = "<modpacks></modpacks>";
     public string ThirdPartyXml { get; set; } = "<modpacks></modpacks>";
+    // fixture seam for the per-code private-pack xml route; populated when a private-pack
+    // flow test lands
+    // ReSharper disable once CollectionNeverUpdated.Global
     public Dictionary<string, string> PrivateXmls { get; } = new(StringComparer.Ordinal);
 
     /// <summary>Archive path suffix (e.g. "modpacks/{dir}/{ver}/{file}") -> zip file path.</summary>
