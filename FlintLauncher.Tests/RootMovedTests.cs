@@ -68,13 +68,12 @@ public class RootMovedTests : IDisposable
         Assert.Equal(renamed, movedEvents[0].New);
     }
 
-    // The production recovery chain, WITHOUT the test-driven RearmAll: the rename must
-    // surface through the watcher's own pipeline (the FSW loss report — or, where the
-    // platform keeps delivering on the renamed inode, whatever recovery the watch layer
-    // performs on its own) and re-point the tenant. Whether each platform reports a rename
-    // of the watched root itself is exactly what this test settles; a platform that never
-    // reports it leaves the watch silently stuck on the dead path, which is the gap a
-    // production-side sweep would close.
+    // The production recovery chain, WITHOUT the test-driven RearmAll — and with the
+    // platform question settled by CI: on linux the FSW never reports the rename (the
+    // first CI run timed out after 10s with nothing pending), so the production trigger is
+    // the watch's own existence sweep — DirectorySpace threads the cadence down, the sweep
+    // takes the lost state, and the anchor re-derives the move. The 100ms cadence here is
+    // the test seam for what runs at 5s in production.
     [Fact]
     public async Task RenamedRoot_TheProductionChain_FiresMoved_WithoutARearm()
     {
@@ -92,7 +91,7 @@ public class RootMovedTests : IDisposable
 
         var moved = new TaskCompletionSource<(AbsolutePath Old, AbsolutePath New)>(
             TaskCreationOptions.RunContinuationsAsynchronously);
-        using var space = new DirectorySpace();
+        using var space = new DirectorySpace(watchSweepInterval: TimeSpan.FromMilliseconds(100));
         space.TenantMoved += (oldDir, newDir) => moved.TrySetResult((oldDir, newDir));
         space.Register(icons, pool.Rescan);
         pool.AttachWatcher(space);

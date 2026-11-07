@@ -14,6 +14,12 @@ namespace FlintLauncher.Core.IO;
 /// the new location and reports the move through <see cref="Moved"/>. On platforms
 /// without rename-following, recovery waits for the root to reappear at the registered
 /// path.</para>
+/// <para>The rename-following cannot rely on the platform events alone: linux inotify
+/// keeps delivering on the renamed inode and never reports the move of the watched root
+/// itself, so a low-frequency existence sweep (<see cref="Rearm"/>'s logic on a timer)
+/// is what takes the watch into the recovery path. macOS additionally cannot re-derive
+/// the new path (no safe channel), so there the sweep only turns a silent rename into
+/// the documented lost state.</para>
 /// <para><see cref="Pulse"/> raises synchronously — tests and embedding hosts drive the
 /// pipeline deterministically instead of waiting on real watcher timing.</para></summary>
 public sealed class DirectoryWatch : IDisposable
@@ -21,6 +27,7 @@ public sealed class DirectoryWatch : IDisposable
     private const int DebounceMsDefault = 200;
     private const int RetryMinMs = 1000;
     private const int RetryMaxMs = 16000;
+    private const int SweepMsDefault = 5000;
 
     private MaterializedDirectory _root;
     private AbsolutePath _currentPath;
@@ -32,6 +39,7 @@ public sealed class DirectoryWatch : IDisposable
     private FileSystemWatcher? _fsw;
     private Timer? _debounceTimer;
     private Timer? _retryTimer;
+    private Timer? _sweepTimer;
     private int _retryDelayMs = RetryMinMs;
     private bool _rootLost;
     private bool _disposed;
@@ -43,12 +51,19 @@ public sealed class DirectoryWatch : IDisposable
     /// <param name="onChanged">The reconcile callback, invoked on debounce coalescence,
     /// on loss/recovery, and from <see cref="Pulse"/>.</param>
     /// <param name="debounce">The burst-coalescing window; null takes the 200ms default.</param>
-    public DirectoryWatch(MaterializedDirectory root, Action onChanged, TimeSpan? debounce = null)
+    /// <param name="sweepInterval">The periodic existence-sweep cadence behind the
+    /// rename-following (a no-op while the root reports present); null takes the 5s
+    /// default.</param>
+    public DirectoryWatch(MaterializedDirectory root, Action onChanged, TimeSpan? debounce = null,
+        TimeSpan? sweepInterval = null)
     {
         _root = root;
         _currentPath = root.Path;
         _onChanged = onChanged;
         _debounce = debounce ?? TimeSpan.FromMilliseconds(DebounceMsDefault);
+        _sweepTimer = new Timer(_ => Rearm(), null,
+            sweepInterval ?? TimeSpan.FromMilliseconds(SweepMsDefault),
+            sweepInterval ?? TimeSpan.FromMilliseconds(SweepMsDefault));
         Bind();
     }
 
@@ -93,11 +108,11 @@ public sealed class DirectoryWatch : IDisposable
     }
 
     /// <summary>Re-binds immediately when the root exists again (else schedules the next
-    /// backoff attempt). The tests' deterministic counterpart of the retry timer. A rename
-    /// the platform never reported (linux inotify keeps delivering on the renamed inode,
-    /// so neither an Error nor a root-Deleted arrives) is caught here: a rearm that finds
-    /// the root gone takes the lost state, and the anchor in TryRebind re-derives the
-    /// move.</summary>
+    /// backoff attempt). The tests' deterministic counterpart of the retry timer, and the
+    /// body of the periodic existence sweep: a rename the platform never reported (linux
+    /// inotify keeps delivering on the renamed inode, so neither an Error nor a root-Deleted
+    /// arrives) is caught here — a sweep that finds the root gone takes the lost state, and
+    /// the anchor in TryRebind re-derives the move.</summary>
     public void Rearm()
     {
         var lostNow = false;
@@ -134,6 +149,8 @@ public sealed class DirectoryWatch : IDisposable
             _debounceTimer = null;
             _retryTimer?.Dispose();
             _retryTimer = null;
+            _sweepTimer?.Dispose();
+            _sweepTimer = null;
             _fsw?.Dispose();
             _fsw = null;
             _anchor?.Dispose();

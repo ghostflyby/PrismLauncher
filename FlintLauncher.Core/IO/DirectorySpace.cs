@@ -22,12 +22,23 @@ public sealed class DirectorySpace : IDisposable
 
     private readonly Dictionary<AbsolutePath, Tenant> _watches = new();
     private readonly Action<Action>? _dispatch;
+    private readonly TimeSpan? _watchSweepInterval;
     private readonly Lock _gate = new();
     private bool _disposed;
 
     /// <summary>Runs every reconcile callback. The composition root passes its
     /// lock/serialization here.</summary>
-    public DirectorySpace(Action<Action>? reconcileDispatcher = null) => _dispatch = reconcileDispatcher;
+    /// <param name="reconcileDispatcher">The dispatcher serialization for the callbacks;
+    /// null runs them inline.</param>
+    /// <param name="watchSweepInterval">The existence-sweep cadence passed down to every
+    /// registered watch (the rename-following's production trigger); null takes the
+    /// watch's 5s default. Tests inject a short cadence to avoid waiting on real
+    /// timing.</param>
+    public DirectorySpace(Action<Action>? reconcileDispatcher = null, TimeSpan? watchSweepInterval = null)
+    {
+        _dispatch = reconcileDispatcher;
+        _watchSweepInterval = watchSweepInterval;
+    }
 
     /// <summary>Raised after a registered root was renamed or moved elsewhere on disk:
     /// (old root, new root). Consumers re-point their own state to the new root
@@ -49,7 +60,8 @@ public sealed class DirectorySpace : IDisposable
                 return;
             }
 
-            var watch = new DirectoryWatch(root, () => RunReconcile(reconcile));
+            var watch = new DirectoryWatch(root, () => RunReconcile(reconcile),
+                sweepInterval: _watchSweepInterval);
             var tenant = new Tenant(watch, moved);
             watch.Moved += (oldRoot, newRoot) => NotifyMoved(tenant, oldRoot, newRoot);
             _watches[root.Path] = tenant;
