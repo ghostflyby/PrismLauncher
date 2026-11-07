@@ -91,26 +91,32 @@ public class RootMovedTests : IDisposable
 
         var moved = new TaskCompletionSource<(AbsolutePath Old, AbsolutePath New)>(
             TaskCreationOptions.RunContinuationsAsynchronously);
+        var renamed = _root / "icons-renamed";
+        var rescanned = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         using var space = new DirectorySpace(watchSweepInterval: TimeSpan.FromMilliseconds(100));
         space.TenantMoved += (oldDir, newDir) => moved.TrySetResult((oldDir, newDir));
-        space.Register(icons, pool.Rescan);
+        // the rescan is the end state: this reconcile fires once the watch re-adopted the
+        // root at its new path, so completing here makes the await deterministic (a task
+        // completed at TenantMoved would race the post-rebind reconcile)
+        space.Register(icons, () =>
+        {
+            pool.Rescan();
+            if (renamed == pool.IconsDir)
+            {
+                rescanned.TrySetResult();
+            }
+        });
         pool.AttachWatcher(space);
         space.Pulse(icons.Path);
         Assert.True(pool.IconFileExists("keep"));
 
-        var renamed = _root / "icons-renamed";
         Directory.Move(icons.Path.Value, renamed.Value);
 
         var winner = await Task.WhenAny(moved.Task, Task.Delay(TimeSpan.FromSeconds(10)));
         Assert.True(winner == moved.Task,
             "the rename never surfaced through the watch layer within 10s — production recovery is blind to it");
-        // the task completes at TenantMoved, before the post-rebind reconcile has rescanned
-        // the pool at the new path — wait for the reconcile instead of racing it
-        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
-        while (!pool.IconFileExists("keep") && DateTime.UtcNow < deadline)
-        {
-            await Task.Delay(50);
-        }
+        winner = await Task.WhenAny(rescanned.Task, Task.Delay(TimeSpan.FromSeconds(10)));
+        Assert.True(winner == rescanned.Task, "the pool was never rescanned at the renamed path");
 
         Assert.Equal(renamed, pool.IconsDir);
         Assert.True(pool.IconFileExists("keep"));
