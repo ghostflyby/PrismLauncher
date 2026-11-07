@@ -11,6 +11,7 @@
 
 using System.Net;
 using System.Text.Json;
+using TruePath;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -149,12 +150,16 @@ public class MigrationApiTests
         Assert.False(File.Exists(PrismRecordPath(host)));
     }
 
-    // the dry-run PREVIEW stays open above the protection — it is read-only planning
+    // the dry-run PREVIEW stays open above the protection — it is read-only planning, and
+    // like /plan it accepts only DETECTED candidates (the sandbox parents make the fixture
+    // source detectable)
     [Fact]
     public async Task DryRun_Preview_Still_Plans_Above_The_Protection()
     {
-        await using var host = await FlintApiHost.StartAsync();
-        var source = MakePrismSource(TempRoot());
+        var root = TempRoot();
+        var source = MakePrismSource(root);
+        await using var host = await FlintApiHost.StartAsync(
+            migrationSourceParents: [new AbsolutePath(root)]);
         Directory.CreateDirectory(Path.Combine(host.HomeDir, "config"));
         await File.WriteAllTextAsync(Path.Combine(host.HomeDir, "config", "flint.json"), "{}");
 
@@ -165,6 +170,53 @@ public class MigrationApiTests
         var plan = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
         Assert.True(plan.GetProperty("dryRun").GetBoolean());
         Assert.True(plan.GetProperty("totalFiles").GetInt64() > 0);
+    }
+
+    // ------------------------------------------- the planning probe gate (CodeQL cs/path-injection)
+
+    // the plan view and the dry-run preview enumerate a directory's full inventory — a raw
+    // path there was an arbitrary-directory probe primitive (CodeQL cs/path-injection, high);
+    // both now accept only detected candidates
+    [Fact]
+    public async Task Plan_NonCandidate_Is_Rejected()
+    {
+        var root = TempRoot();
+        var source = MakePrismSource(root);
+        // the host scans DIFFERENT parents, so the source exists but is not a candidate
+        var otherRoot = TempRoot();
+        await using var host = await FlintApiHost.StartAsync(
+            migrationSourceParents: [new AbsolutePath(otherRoot)]);
+
+        var plan = await host.GetAsync($"/api/v1/migration/prism/plan?source={Uri.EscapeDataString(source)}&mode=copy");
+        Assert.Equal(HttpStatusCode.BadRequest, plan.StatusCode);
+        Assert.Equal("invalid_source", ErrorCode(plan));
+
+        var dryRun = await host.PostAsync("/api/v1/migration/prism",
+            new { source, mode = "copy", dryRun = true });
+        Assert.Equal(HttpStatusCode.BadRequest, dryRun.StatusCode);
+        Assert.Equal("invalid_source", ErrorCode(dryRun));
+    }
+
+    [Fact]
+    public async Task Plan_A_Candidate_Plans_The_Inventory()
+    {
+        var root = TempRoot();
+        var source = MakePrismSource(root);
+        await using var host = await FlintApiHost.StartAsync(
+            migrationSourceParents: [new AbsolutePath(root)]);
+
+        var plan = await host.GetAsync($"/api/v1/migration/prism/plan?source={Uri.EscapeDataString(source)}&mode=copy");
+
+        Assert.Equal(HttpStatusCode.OK, plan.StatusCode);
+        var body = JsonDocument.Parse(await plan.Content.ReadAsStringAsync()).RootElement;
+        Assert.Equal(source, body.GetProperty("source").GetString());
+        Assert.Equal("Copy", body.GetProperty("mode").GetString());
+        Assert.True(body.GetProperty("totalFiles").GetInt64() > 0);
+
+        var candidates = await host.GetAsync("/api/v1/migration/prism/candidates");
+        Assert.Equal(HttpStatusCode.OK, candidates.StatusCode);
+        Assert.True(JsonDocument.Parse(await candidates.Content.ReadAsStringAsync())
+            .RootElement.GetArrayLength() > 0);
     }
 
     // the guard must not over-reject: a FRESH target still imports to completion, and the

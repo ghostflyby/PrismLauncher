@@ -70,7 +70,7 @@ internal sealed class FlintApiHost : IAsyncDisposable
 
     public static async Task<FlintApiHost> StartAsync(ModrinthClient? modrinth = null, FlameClient? flame = null,
         TechnicApi? technic = null, AtLauncherApi? atlauncher = null, FtbApi? ftb = null,
-        AuthEndpointsOptions? auth = null)
+        AuthEndpointsOptions? auth = null, IReadOnlyList<AbsolutePath>? migrationSourceParents = null)
     {
         var homeDir = Path.Combine(Path.GetTempPath(), $"flint-api-{Guid.NewGuid():N}");
         Directory.CreateDirectory(homeDir);
@@ -84,7 +84,7 @@ internal sealed class FlintApiHost : IAsyncDisposable
             "--home-dir", homeDir,
             "--api-token", token,
             "--urls", "http://127.0.0.1:0",
-        ], modrinth, flame, technic, atlauncher, ftb, auth);
+        ], modrinth, flame, technic, atlauncher, ftb, auth, migrationSourceParents: migrationSourceParents);
         await app.StartAsync();
         var client = new HttpClient { BaseAddress = new Uri(app.Urls.First()) };
         // every API route (except /healthz and /api/v1/info) requires the injected token
