@@ -59,8 +59,12 @@ public sealed class RollingFileLoggerProvider : ILoggerProvider
                 source.Move(directory.Path / FileName(generation + 1), overwrite: true);
             }
 
+            // the live log shares read+delete: parallel runtimes in one process read it,
+            // and on windows a delete or move of the still-open file only succeeds when
+            // the holder opted into FILE_SHARE_DELETE (a crash path never disposes)
             _writer = new StreamWriter(
-                (directory.Path / FileName(0)).Open(FileMode.Create, FileAccess.Write, FileShare.Read))
+                (directory.Path / FileName(0)).Open(FileMode.Create, FileAccess.Write,
+                    FileShare.ReadWrite | FileShare.Delete))
             {
                 AutoFlush = true,
             };

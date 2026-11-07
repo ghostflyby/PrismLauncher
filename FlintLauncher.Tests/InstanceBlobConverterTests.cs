@@ -161,7 +161,14 @@ public class InstanceBlobConverterTests : IDisposable
     public void Shortcuts_Legacy_String_Blob_Parses_The_Embedded_Array()
     {
         File.WriteAllText(RealFilePath(), "x");
-        var blob = $$"""[{"name":"Minecraft","filePath":"{{RealFilePath()}}","target":1}]""";
+        // the path rides through the serializer: a windows temp path's backslashes are
+        // JSON escapes and cannot travel inside a raw string literal
+        var blob = new JsonArray(new JsonObject
+        {
+            ["name"] = "Minecraft",
+            ["filePath"] = RealFilePath(),
+            ["target"] = 1,
+        }).ToJsonString();
         var config = Parse(LegacyDoc("identity", "shortcuts", blob));
 
         var shortcut = Assert.Single(Shortcuts(config));
@@ -174,8 +181,12 @@ public class InstanceBlobConverterTests : IDisposable
     public void Shortcuts_Native_Array_Binds_Directly()
     {
         File.WriteAllText(RealFilePath(), "x");
-        var node = JsonNode.Parse($$"""[{"name":"N","filePath":"{{RealFilePath()}}","target":0}]""");
-        Assert.NotNull(node);
+        var node = new JsonArray(new JsonObject
+        {
+            ["name"] = "N",
+            ["filePath"] = RealFilePath(),
+            ["target"] = 0,
+        });
         var config = Parse(NativeDoc("identity", "shortcuts", node));
         var shortcut = Assert.Single(Shortcuts(config));
         Assert.Equal(ShortcutTarget.Desktop, shortcut.Target);
@@ -188,20 +199,17 @@ public class InstanceBlobConverterTests : IDisposable
         Directory.CreateDirectory(RealDirPath());
         var file = RealFilePath();
         var ghost = Path.Combine(_dir, "ghost");
-        var array = JsonNode.Parse($$"""
-            [
-              {"name":"Good","filePath":"{{file}}","target":0},
-              {"name":"DirEntry","filePath":"{{RealDirPath()}}","target":2},
-              {"filePath":"{{file}}","target":0},
-              {"name":"NoTarget","filePath":"{{file}}"},
-              {"name":"BadTarget","filePath":"{{file}}","target":3},
-              {"name":"NegTarget","filePath":"{{file}}","target":-1},
-              {"name":"Ghost","filePath":"{{ghost}}","target":0},
-              "not-a-shortcut",
-              {"name":42,"filePath":"{{file}}","target":0}
-            ]
-            """);
-        Assert.NotNull(array);
+        var array = new JsonArray(
+            new JsonObject { ["name"] = "Good", ["filePath"] = file, ["target"] = 0 },
+            new JsonObject { ["name"] = "DirEntry", ["filePath"] = RealDirPath(), ["target"] = 2 },
+            new JsonObject { ["filePath"] = file, ["target"] = 0 },
+            new JsonObject { ["name"] = "NoTarget", ["filePath"] = file },
+            new JsonObject { ["name"] = "BadTarget", ["filePath"] = file, ["target"] = 3 },
+            new JsonObject { ["name"] = "NegTarget", ["filePath"] = file, ["target"] = -1 },
+            new JsonObject { ["name"] = "Ghost", ["filePath"] = ghost, ["target"] = 0 },
+            JsonValue.Create("not-a-shortcut"),
+            new JsonObject { ["name"] = 42, ["filePath"] = file, ["target"] = 0 }
+        );
         var config = Parse(NativeDoc("identity", "shortcuts", array));
 
         // only the well-formed entries whose path exists survive the former reader's filter
