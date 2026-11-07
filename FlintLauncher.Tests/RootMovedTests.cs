@@ -94,7 +94,16 @@ public class RootMovedTests : IDisposable
         var renamed = _root / "icons-renamed";
         var rescanned = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         using var space = new DirectorySpace(watchSweepInterval: TimeSpan.FromMilliseconds(100));
-        space.TenantMoved += (oldDir, newDir) => moved.TrySetResult((oldDir, newDir));
+        space.TenantMoved += (oldDir, newDir) =>
+        {
+            moved.TrySetResult((oldDir, newDir));
+            // the host wiring's re-point (Register is idempotent per root, so AttachWatcher's
+            // own moved callback never lands on top of the registration above)
+            if (oldDir == icons.Path)
+            {
+                pool.SetIconsDir(newDir);
+            }
+        };
         // the rescan is the end state: this reconcile fires once the watch re-adopted the
         // root at its new path, so completing here makes the await deterministic (a task
         // completed at TenantMoved would race the post-rebind reconcile)
