@@ -14,6 +14,7 @@ using FlintLauncher.Core.Settings;
 using FlintLauncher.Core.Tools;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.Services;
+using Microsoft.Extensions.Options;
 
 namespace FlintLauncher.Web.Endpoints;
 
@@ -82,7 +83,7 @@ public static class MiscEndpoints
         // GuiUtil::uploadPaste: either the raw content or a finished task's buffered log goes
         // to the configured paste provider (PastebinType + PastebinCustomAPIBase global
         // settings, provider default = mclo.gs). Paste bodies are small; this runs synchronously.
-        api.MapPost("/paste", async (PasteRequest? request, FlintConfigStore config, HttpClient http, FlintTaskRegistry registry) =>
+        api.MapPost("/paste", async (PasteRequest? request, IOptionsMonitor<FlintConfigFile> config, HttpClient http, FlintTaskRegistry registry) =>
         {
             if (request is null)
             {
@@ -127,11 +128,11 @@ public static class MiscEndpoints
             }
 
             // the typed user layer (the SettingsObject view retired)
-            var typeIndex = config.Current.Api.PastebinType ?? (int)PasteUpload.PasteType.Mclogs;
+            var typeIndex = config.CurrentValue.Api.PastebinType ?? (int)PasteUpload.PasteType.Mclogs;
             var pasteType = typeIndex >= 0 && typeIndex < PasteUpload.PasteTypes.Length
                 ? (PasteUpload.PasteType)typeIndex
                 : PasteUpload.PasteType.Mclogs;
-            var upload = new PasteUpload(content, config.Current.Api.PastebinCustomApiBase ?? "",
+            var upload = new PasteUpload(content, config.CurrentValue.Api.PastebinCustomApiBase ?? "",
                 pasteType, http);
             try
             {

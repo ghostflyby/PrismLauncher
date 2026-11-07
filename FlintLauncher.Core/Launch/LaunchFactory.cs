@@ -9,6 +9,7 @@ using FlintLauncher.Core.Launch.Steps;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Settings;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace FlintLauncher.Core.Launch;
 
@@ -20,7 +21,7 @@ namespace FlintLauncher.Core.Launch;
 /// <param name="loggerFactory">The host diagnostics factory.</param>
 /// <param name="http">The client the runtime archive download rides.</param>
 /// <param name="ui">The GUI touchpoints; unset keeps the headless defaults.</param>
-/// <param name="config">The typed flint.json store (the java/download switches).</param>
+/// <param name="config">The typed flint.json read face (the java/download switches).</param>
 /// <param name="dirs">The dir-kind settings: the JavaDir resolution for the java root, and
 /// the managed-versions javalist scans that root — both resolve per launch.</param>
 /// <param name="auth">The auth environment for the pre-launch account refresh.</param>
@@ -30,7 +31,7 @@ public sealed class LaunchFactory(
     HttpClient http,
     LaunchOptions? options = null,
     LaunchUiHooks? ui = null,
-    FlintConfigStore? config = null,
+    IOptionsMonitor<FlintConfigFile>? config = null,
     ConfiguredDirs? dirs = null,
     AuthEndpointsOptions? auth = null)
 {

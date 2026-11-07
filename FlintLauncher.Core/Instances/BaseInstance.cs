@@ -65,6 +65,7 @@ using FlintLauncher.Core.Minecraft;
 using FlintLauncher.Core.Settings;
 using FlintLauncher.Core.State;
 using FlintLauncher.Core.Text;
+using Microsoft.Extensions.Options;
 using TruePath;
 
 namespace FlintLauncher.Core.Instances;
@@ -737,9 +738,9 @@ public abstract class BaseInstance : INotifyPropertyChanged
     protected FlintConfigFile UserLayer =>
         (InstanceSettings as InstanceJsonSettingsObject)?.UserLayer ?? FlintConfigFile.Default();
 
-    /// <summary>The live user-layer store (flint.json) when the settings object is the typed
-    /// adapter — handed to the LaunchFactory so the launch pipeline reads the same stack.</summary>
-    protected FlintConfigStore? UserConfigStore =>
+    /// <summary>The live user-layer read face (flint.json) when the settings object is the
+    /// typed adapter — the same stack the launch pipeline reads.</summary>
+    protected IOptionsMonitor<FlintConfigFile>? UserConfig =>
         (InstanceSettings as InstanceJsonSettingsObject)?.UserConfig;
 
     protected bool IsSpecificSettingsLoaded() => _specificSettingsLoaded;

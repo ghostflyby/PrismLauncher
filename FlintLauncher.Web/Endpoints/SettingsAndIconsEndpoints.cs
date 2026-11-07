@@ -195,6 +195,8 @@ public static class SettingsAndIconsEndpoints
                     $"'group' must be one of: {string.Join(", ", Groups.Keys)}", 400);
             }
 
+            // the whole request is checked before anything is written: one unknown key
+            // refuses all of it
             foreach (var prop in body.Values.EnumerateObject())
             {
                 if (!keys.Contains(prop.Name))
@@ -202,7 +204,12 @@ public static class SettingsAndIconsEndpoints
                     return ApiJson.Error("unknown_setting",
                         $"key '{prop.Name}' is not part of group '{body.Group}'", 400);
                 }
+            }
 
+            var writes = new List<KeyValuePair<string, object?>>();
+            var secretWritten = false;
+            foreach (var prop in body.Values.EnumerateObject())
+            {
                 var value = TypedValue(
                     prop.Value.ValueKind == JsonValueKind.Null ? "" : prop.Value.Clone(),
                     FlintConfigKeys.Default(prop.Name));
@@ -218,19 +225,30 @@ public static class SettingsAndIconsEndpoints
                     {
                         secrets.Delete(prop.Name);
                     }
+
+                    secretWritten = true;
                 }
                 else
                 {
-                    config.Set(prop.Name, value);
+                    writes.Add(new(prop.Name, value));
                 }
             }
 
-            // proxy / retries / timeout / user-agent take effect immediately (Application
-            // re-runs updateProxySettings from the ProxyPage the same way); the apply also
-            // re-reads the store-backed secrets and the mod-platform API credentials
-            netConfig.Apply();
+            // one commit for the group: one atomic save, one change notification — the
+            // host's subscription re-applies the network stack and the dir-kind models from
+            // it, so a listener never sees a half-written proxy tuple
+            config.Set(writes);
 
-            // the dir-kind models re-point to their (created-on-demand) new roots
+            // a secret write replaces no config snapshot, so nothing fires for it: the
+            // secret-backed values (proxy password, API credentials) are applied here
+            if (secretWritten)
+            {
+                netConfig.Apply();
+            }
+
+            // the dir-kind models re-pointed through the subscription already; this second,
+            // idempotent pass is the one whose failure reaches the caller (a root that cannot
+            // be created is a 500, not a log line)
             if (body.Group == "dirs")
             {
                 dirSettings.Apply();

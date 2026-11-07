@@ -46,6 +46,10 @@ public static class LogCategories
     /// and the mid-assembly crash report — everything the host logs after Build for steps
     /// the assembly ran before any logger existed.</summary>
     public const string Startup = "flint.startup";
+
+    /// <summary>Settings: re-applying a changed user layer onto the live services (the
+    /// network stack, the dir-kind models) — the failures a writer never sees.</summary>
+    public const string Settings = "flint.settings";
 }
 
 /// <summary>Per-instance resolution of a diagnostics logger from the injected

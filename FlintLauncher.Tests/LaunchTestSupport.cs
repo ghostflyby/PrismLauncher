@@ -86,7 +86,7 @@ public class GlobalLaunchSettingsStub
 
     /// <summary>The typed instance environment over this store (the instance.json stack).</summary>
     public InstanceEnvironment Environment =>
-        new(Store, FlintJsonContext.Default.InstanceConfigFile, FlintJsonContext.Default.InstanceStateFile);
+        new(Store.Monitor, FlintJsonContext.Default.InstanceConfigFile, FlintJsonContext.Default.InstanceStateFile);
 
     public static implicit operator InstanceEnvironment(
         GlobalLaunchSettingsStub stub) => stub.Environment;
@@ -215,7 +215,7 @@ public sealed class LaunchFixture : IDisposable
         var instance = new MinecraftInstance(
             new InstanceJsonSettingsObject(
                 new AbsolutePath(instanceRoot), new InstanceEnvironment(
-                    Global.Store, FlintJsonContext.Default.InstanceConfigFile,
+                    Global.Store.Monitor, FlintJsonContext.Default.InstanceConfigFile,
                     FlintJsonContext.Default.InstanceStateFile)),
             new AbsolutePath(instanceRoot),
             // the ctor-injected store root (InstanceList does the same in the host): the

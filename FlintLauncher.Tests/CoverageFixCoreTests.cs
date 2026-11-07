@@ -211,7 +211,7 @@ public class CoverageFixCoreTests
             config.Set("RequestTimeout", 120);
             config.Set("UserAgentOverride", "Flint-NetCfg-Agent/9.9");
 
-            new NetConfigApplier(config, secrets, primary, retry,
+            new NetConfigApplier(config.Monitor, secrets, primary, retry,
                 new ModrinthClient(), new FlameClient(), new AuthEndpointsOptions()).Apply();
 
             Assert.Equal(("HTTP", "10.1.2.3", 8118, "", ""), primary.Proxy);

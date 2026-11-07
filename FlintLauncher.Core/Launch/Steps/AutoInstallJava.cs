@@ -39,6 +39,7 @@ using FlintLauncher.Core.Meta;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Settings;
 using FlintLauncher.Core.Tasks;
+using Microsoft.Extensions.Options;
 using TruePath;
 using TruePath.SystemIo;
 using Index = FlintLauncher.Core.Meta.Index;
@@ -47,10 +48,10 @@ namespace FlintLauncher.Core.Launch.Steps;
 
 /// <summary>The runtime-pick/install step. The injected java root is the only layout this
 /// step reads: where the launcher-managed runtimes install (the JavaDir setting under store
-/// semantics, resolved by the factory at step creation). The nullable store and javalist
+/// semantics, resolved by the factory at step creation). The nullable read face and javalist
 /// keep the bare-fixture degrades (switches off; the "no compatible Java" warning).</summary>
 public sealed class AutoInstallJava(LaunchTask parent, HttpClient http, AbsolutePath javaRoot,
-    FlintConfigStore? config = null, JavaInstallList? javaInstallList = null) : LaunchStep(parent)
+    IOptionsMonitor<FlintConfigFile>? config = null, JavaInstallList? javaInstallList = null) : LaunchStep(parent)
 {
     private readonly MinecraftInstance _instance = parent.Instance;
     private int _majorJavaVersionIndex;
@@ -66,7 +67,7 @@ public sealed class AutoInstallJava(LaunchTask parent, HttpClient http, Absolute
         // store keeps the bare-fixture "feature off" behavior the former unset global double
         // produced
         if (config is not { } cfg ||
-            !(cfg.Current.Java.AutomaticJavaSwitch ?? false) ||
+            !(cfg.CurrentValue.Java.AutomaticJavaSwitch ?? false) ||
             (Variant.AsBool(settings.Get("OverrideJavaLocation")) &&
              (File.Exists(Variant.AsString(settings.Get("JavaPath"))) || Directory.Exists(Variant.AsString(settings.Get("JavaPath"))))))
         {
@@ -74,7 +75,7 @@ public sealed class AutoInstallJava(LaunchTask parent, HttpClient http, Absolute
         }
 
         var packProfile = _instance.GetPackProfile();
-        if (!(cfg.Current.Java.AutomaticJavaDownload ?? false))
+        if (!(cfg.CurrentValue.Java.AutomaticJavaDownload ?? false))
         {
             var javas = javaInstallList;
             if (javas is not null)

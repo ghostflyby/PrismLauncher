@@ -24,6 +24,7 @@ using FlintLauncher.ExternalApi.Flame;
 using FlintLauncher.ExternalApi.Modrinth;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.Services;
+using Microsoft.Extensions.Options;
 
 namespace FlintLauncher.Web.Endpoints;
 
@@ -425,7 +426,7 @@ public static class ModPlatformEndpoints
         }).Produces<TaskAcceptedResponse>(202);
 
         api.MapPost("/instances/{id}/mods/update", async (string id, ModsUpdateRequest? filter,
-            InstanceList instances, InstanceMutationLock instanceLock, FlintConfigStore config,
+            InstanceList instances, InstanceMutationLock instanceLock, IOptionsMonitor<FlintConfigFile> config,
             ModrinthClient modrinth, HttpClient http, FlameClient flame, FlintTaskRegistry registry) =>
         {
             await instanceLock.WaitAsync();
@@ -445,7 +446,7 @@ public static class ModPlatformEndpoints
                     filter?.ReleaseTypes is { Count: > 0 } requested
                         ? IndexedVersionType.FromStringList(requested)
                         : IndexedVersionType.FromStringList(SettingsJson.ToStringList(
-                            config.Current.ModDownload.ModUpdateReleaseTypes ?? "[]"));
+                            config.CurrentValue.ModDownload.ModUpdateReleaseTypes ?? "[]"));
 
                 var task = new ModsUpdateTask(instance, instance.LoaderModList(), filter?.Mods, modrinth, http, flame, releaseTypes);
 

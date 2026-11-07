@@ -72,7 +72,7 @@ internal sealed class TestGlobalSettings
     public void StubSet(string key, object? value) => Store.Set(key, value);
 
     /// <summary>The instance-layer environment over this store (the typed stack).</summary>
-    public InstanceEnvironment Environment => new(Store,
+    public InstanceEnvironment Environment => new(Store.Monitor,
         FlintJsonContext.Default.InstanceConfigFile, FlintJsonContext.Default.InstanceStateFile);
 
     public static implicit operator InstanceEnvironment(TestGlobalSettings settings) => settings.Environment;
@@ -98,7 +98,7 @@ internal sealed class TestGlobalSettings
 /// fixture form) for tests that construct instances directly.</summary>
 internal static class TestInstanceEnvironment
 {
-    public static InstanceEnvironment Default(FlintConfigStore? user = null) => new(user,
+    public static InstanceEnvironment Default(FlintConfigStore? user = null) => new(user?.Monitor,
         FlintJsonContext.Default.InstanceConfigFile, FlintJsonContext.Default.InstanceStateFile);
 }
 

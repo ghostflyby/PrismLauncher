@@ -32,7 +32,7 @@ public class RealDataSmokeTests
         // real data dir); the real global INI is not imported here — the defaults suffice
         // for the shape assertions below
         var user = TestGlobalSettings.CreateStore();
-        var environment = new InstanceEnvironment(user,
+        var environment = new InstanceEnvironment(user.Monitor,
             FlintJsonContext.Default.InstanceConfigFile, FlintJsonContext.Default.InstanceStateFile);
 
         var instancesDir = Path.Combine(DataDir, "instances");

@@ -33,6 +33,7 @@ using FlintLauncher.Web.Logging;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.OpenApi;
 using FlintLauncher.Web.Services;
+using Microsoft.Extensions.Options;
 using TruePath;
 
 // extension-method log events (HttpLog.Request/Probe) live in the Core Diagnostics namespace
@@ -191,7 +192,7 @@ public static class WebHostBuilder
             // state keys → the state store, the rest → the record domains
             config = new FlintConfigStore(paths.ConfigFile, FlintJsonContext.Default.FlintConfigFile);
             configImport = FlintConfigImporter.ImportIfNeeded(paths, config, secrets, state);
-            dirs = new ConfiguredDirs(paths, config);
+            dirs = new ConfiguredDirs(paths, config.Monitor);
 
             // the standard base table, registered exactly once before any use, then the
             // ledger Load(): the persisted index restores, so existing entries do not
@@ -206,7 +207,7 @@ public static class WebHostBuilder
             instances = new InstanceList(
                 [instanceDirs],
                 new InstanceEnvironment(
-                    config, FlintJsonContext.Default.InstanceConfigFile,
+                    config.Monitor, FlintJsonContext.Default.InstanceConfigFile,
                     FlintJsonContext.Default.InstanceStateFile),
                 paths.GroupsFile,
                 [paths.InstgroupsFile, instanceDirs.Path / "instgroups.json"],
@@ -217,6 +218,9 @@ public static class WebHostBuilder
             // external changes to the instance roots reload the list (coalesced, serialized
             // through the instance lock) instead of waiting for a caller
             instances.AttachWatcher(watchSpace);
+            // the same tenancy for flint.json: an external edit reloads the user layer (the
+            // store's own writes resolve to the current snapshot and fire nothing)
+            config.AttachWatcher(watchSpace);
 
             // icon library and local skin library over their dir-kind settings
             icons = new IconPool(MaterializedDirectory.Ensure(dirs.IconsDir)!);
@@ -270,6 +274,12 @@ public static class WebHostBuilder
         builder.Services.AddSingleton(retryHandler);
         builder.Services.AddSingleton(http);
         builder.Services.AddSingleton(config);
+        // the Options faces over the same store: the closed registrations win over the
+        // host's open-generic ones, so IOptions/IOptionsSnapshot/IOptionsMonitor of the user
+        // layer all hand the store's record (no binder, no Activator) and follow its changes
+        builder.Services.AddSingleton<IOptionsFactory<FlintConfigFile>>(config);
+        builder.Services.AddSingleton<IOptionsChangeTokenSource<FlintConfigFile>>(config);
+        builder.Services.AddSingleton(config.Monitor);
         builder.Services.AddSingleton(dirs);
         builder.Services.AddSingleton(state);
         builder.Services.AddSingleton(secrets);
@@ -277,6 +287,9 @@ public static class WebHostBuilder
         builder.Services.AddSingleton(metaCache);
         builder.Services.AddSingleton(instances);
         builder.Services.AddSingleton(instanceLock);
+        // the watch tenancy itself: embedding hosts and tests reconcile it synchronously
+        // (Pulse) instead of waiting on watcher timing
+        builder.Services.AddSingleton(watchSpace);
         builder.Services.AddSingleton(icons);
         builder.Services.AddSingleton(skins);
         builder.Services.AddSingleton(accounts);
@@ -305,19 +318,43 @@ public static class WebHostBuilder
             // (LaunchTask::parseXmlLogs); the port keeps it behind an opt-in gate for
             // pure-core consumers and this host turns it on
             new LaunchOptions(XmlLogParsing: true),
-            config: config,
+            config: config.Monitor,
             dirs: dirs,
             auth: authOptions));
 
         var app = builder.Build();
         var loggerFactory = app.Services.GetRequiredService<ILoggerFactory>();
 
-        // the two assembled services with deferred shutdown work: the watch tenancy stops
-        // its watchers, the metacache ledger flushes its pending write (the 30s timer) so
-        // shutdown after activity does not cost re-hashes and revalidations on the next start.
-        // One callback in this order — the watchers must not fire into a flushed ledger.
+        // proxy / NumberOfManualRetries / RequestTimeout / UserAgentOverride reach the
+        // shared Http stack now, and again on every committed change of the user layer (a
+        // /settings write, the import completion, an external edit of flint.json); the
+        // dir-kind models re-point the same way. A failing re-apply is logged here — the
+        // writer that committed the change is not the place to throw it back into.
+        var netConfig = app.Services.GetRequiredService<NetConfigApplier>();
+        var dirSettings = app.Services.GetRequiredService<DirSettingsApplier>();
+        netConfig.Apply();
+        var settingsLog = loggerFactory.CreateLogger(LogCategories.Settings);
+        var configSubscription = config.Monitor.OnChange(_ =>
+        {
+            try
+            {
+                netConfig.Apply();
+                dirSettings.Apply();
+            }
+            catch (Exception e)
+            {
+                settingsLog.LogWarning(e, "re-applying the changed settings onto the live services failed");
+            }
+        });
+
+        // the assembled services with deferred shutdown work: the settings subscription
+        // detaches, the watch tenancy stops its watchers, the metacache ledger flushes its
+        // pending write (the 30s timer) so shutdown after activity does not cost re-hashes
+        // and revalidations on the next start. One callback in this order — the watchers
+        // must not fire into a flushed ledger.
         app.Lifetime.ApplicationStopping.Register(() =>
         {
+            configSubscription?.Dispose();
             watchSpace.Dispose();
             metaCache.Dispose();
         });
@@ -385,10 +422,6 @@ public static class WebHostBuilder
                     Stopwatch.GetElapsedTime(start).TotalMilliseconds);
             }
         });
-
-        // proxy / NumberOfManualRetries / RequestTimeout / UserAgentOverride reach the
-        // shared Http stack (also re-applied after every settings write)
-        app.Services.GetRequiredService<NetConfigApplier>().Apply();
 
         // uniform {"error":{...}} body for unhandled faults
         app.Use(async (context, next) =>

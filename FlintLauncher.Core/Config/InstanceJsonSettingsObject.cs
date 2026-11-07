@@ -21,13 +21,14 @@
 // and, together with the typed user stack, retires the FlintConfigSettings adapter.
 
 using FlintLauncher.Core.Settings;
+using Microsoft.Extensions.Options;
 using TruePath;
 
 namespace FlintLauncher.Core.Config;
 
 public sealed class InstanceJsonSettingsObject(AbsolutePath instanceRoot, InstanceEnvironment environment) : SettingsObject
 {
-    private readonly FlintConfigStore? _userConfig = environment.UserConfig;
+    private readonly IOptionsMonitor<FlintConfigFile>? _userConfig = environment.UserConfig;
 
     /// <summary>The typed instance.json store (dual-track marker + write target).</summary>
     public InstanceConfigStore ConfigStore { get; } = new(instanceRoot, environment.ConfigInfo);
@@ -35,13 +36,13 @@ public sealed class InstanceJsonSettingsObject(AbsolutePath instanceRoot, Instan
     /// <summary>The typed instance-state.json store (the runtime time trio).</summary>
     public InstanceStateStore StateStore { get; } = new(instanceRoot, environment.StateInfo);
 
-    /// <summary>The live user-layer store (flint.json) when one is wired, for hosts that
-    /// hand the same stack onward (the LaunchFactory) — null on bare fixtures.</summary>
-    public FlintConfigStore? UserConfig => _userConfig;
+    /// <summary>The live user-layer read face (flint.json) when one is wired, for hosts that
+    /// hand the same stack onward — null on bare fixtures.</summary>
+    public IOptionsMonitor<FlintConfigFile>? UserConfig => _userConfig;
 
     /// <summary>The live user layer (flint.json), or the record defaults when the host has no
     /// config store (bare fixtures) — matching the former unset-global behavior.</summary>
-    public FlintConfigFile UserLayer => _userConfig?.Current ?? FlintConfigFile.Default();
+    public FlintConfigFile UserLayer => _userConfig?.CurrentValue ?? FlintConfigFile.Default();
 
     protected override void ChangeSetting(Setting setting, object? value)
     {

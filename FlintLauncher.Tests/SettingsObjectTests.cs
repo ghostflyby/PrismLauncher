@@ -36,7 +36,7 @@ public class SettingsObjectTests : IDisposable
     private AbsolutePath JsonPath => _root / "instance.json";
 
     private InstanceJsonSettingsObject Settings(FlintConfigStore? user = null) =>
-        new(_root, new InstanceEnvironment(user, FlintJsonContext.Default.InstanceConfigFile,
+        new(_root, new InstanceEnvironment(user?.Monitor, FlintJsonContext.Default.InstanceConfigFile,
             FlintJsonContext.Default.InstanceStateFile));
 
     /// <summary>A user layer with one non-default member (the fold's lower layer).</summary>
