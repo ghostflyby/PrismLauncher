@@ -288,7 +288,11 @@ public class FlintApiIntegrationTests
         var uuid = entry.GetProperty("uuid").GetString();
         Assert.NotNull(uuid);
         Assert.False(string.IsNullOrEmpty(uuid));
-        Assert.NotEqual(0L, entry.GetProperty("inode").GetInt64()); // unix stat; Windows would be 0
+        // unix stat; windows has no inode and reports 0
+        if (!OperatingSystem.IsWindows())
+        {
+            Assert.NotEqual(0L, entry.GetProperty("inode").GetInt64());
+        }
 
         // detail -----------------------------------------------------------------------
         var detail = JsonDocument.Parse(

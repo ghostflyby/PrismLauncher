@@ -93,8 +93,32 @@ public sealed class DirectoryWatch : IDisposable
     }
 
     /// <summary>Re-binds immediately when the root exists again (else schedules the next
-    /// backoff attempt). The tests' deterministic counterpart of the retry timer.</summary>
-    public void Rearm() => TryRebind();
+    /// backoff attempt). The tests' deterministic counterpart of the retry timer. A rename
+    /// the platform never reported (linux inotify keeps delivering on the renamed inode,
+    /// so neither an Error nor a root-Deleted arrives) is caught here: a rearm that finds
+    /// the root gone takes the lost state, and the anchor in TryRebind re-derives the
+    /// move.</summary>
+    public void Rearm()
+    {
+        var lostNow = false;
+        lock (_gate)
+        {
+            if (!_disposed && !_rootLost && !_currentPath.ExistsDirectory())
+            {
+                _rootLost = true;
+                _fsw?.Dispose();
+                _fsw = null;
+                lostNow = true;
+            }
+        }
+
+        if (lostNow)
+        {
+            FireChanged(); // tenants orphan now (the same notice a reported loss fires)
+        }
+
+        TryRebind();
+    }
 
     public void Dispose()
     {

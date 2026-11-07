@@ -43,9 +43,9 @@ public class ExtractNativesTests
                                                              "name": "com.flint:testnatives:1.0",
                                                              "MMC-hint": "local",
                                                              "natives": {
-                                                                 "osx-": "natives-osx", "osx": "natives-osx", "osx-arm64": "natives-osx", "osx-x86_64": "natives-osx",
-                                                                 "linux": "natives-linux", "linux-arm64": "natives-linux", "linux-x86_64": "natives-linux",
-                                                                 "windows": "natives-windows", "windows-x86_64": "natives-windows"
+                                                                     "osx-": "natives-osx", "osx": "natives-osx", "osx-arm64": "natives-osx", "osx-x86_64": "natives-osx",
+                                                                     "linux-": "natives-linux", "linux": "natives-linux", "linux-arm64": "natives-linux", "linux-x86_64": "natives-linux",
+                                                                     "windows-": "natives-windows", "windows": "natives-windows", "windows-arm64": "natives-windows", "windows-x86_64": "natives-windows"
                                                              }
                                                          }
                                                      ]

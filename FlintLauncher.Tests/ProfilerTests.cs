@@ -78,9 +78,10 @@ public class ProfilerTests
 
         var (program, arguments) = factory.BuildCommand(settings, pid: 4321);
 
-        // QDir(basePath).absoluteFilePath("bin/jpenable[.exe]")
-        var expectedProgram = OperatingSystem.IsWindows() ? "/opt/jprofiler/bin/jpenable.exe" : "/opt/jprofiler/bin/jpenable";
-        Assert.Equal(expectedProgram, program.Value);
+        // QDir(basePath).absoluteFilePath("bin/jpenable[.exe]") — the expectation composes
+        // through the same path type as the production code, so the separators compare
+        var exeName = OperatingSystem.IsWindows() ? "jpenable.exe" : "jpenable";
+        Assert.Equal((new AbsolutePath("/opt/jprofiler") / "bin" / exeName).Value, program.Value);
         // { "-d", pid, "--gui", "-p", port }
         Assert.Equal(["-d", "4321", "--gui", "-p", "51515"], arguments);
     }
@@ -149,7 +150,7 @@ public class ProfilerTests
 
         var (program, arguments) = factory.BuildCommand(settings, pid: 999);
 
-        Assert.Equal("/usr/bin/visualvm", program.Value);
+        Assert.Equal(new AbsolutePath("/usr/bin/visualvm").Value, program.Value);
         // { "--openpid", pid }
         Assert.Equal(["--openpid", "999"], arguments);
     }
