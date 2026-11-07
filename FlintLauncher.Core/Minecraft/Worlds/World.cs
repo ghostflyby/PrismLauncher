@@ -388,10 +388,12 @@ public sealed class World
         return obj is World other && IsValid == other.IsValid && FolderName == other.FolderName;
     }
 
-    // the hash follows the deliberately weak equality (validity + folder name); IsValid
-    // is mutable by design (readFromFS flips it), same lifetime as the C++ hash usage
-    // ReSharper disable once NonReadonlyMemberInGetHashCode
+    // the hash follows the deliberately weak equality (validity + folder name); both
+    // members are mutable by design (readFromFS/rename flip them), same lifetime as the
+    // C++ hash usage
+    // ReSharper disable NonReadonlyMemberInGetHashCode
     public override int GetHashCode() => HashCode.Combine(IsValid, FolderName);
+    // ReSharper restore NonReadonlyMemberInGetHashCode
 
     // ------------------------------------------------------------------ internals
 

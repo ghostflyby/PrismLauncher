@@ -50,9 +50,13 @@ public sealed class LauncherStateStore
     /// file would otherwise surface null halves), then the gate hands differing versions to
     /// <see cref="Evolve"/>. Fluent's own writes always round-trip every member; the fold is
     /// the defense for older-schema payloads and hand-edited files.</summary>
-    // ReSharper disable once InconsistentlySynchronizedField
-    private LauncherState Load() =>
-        _file.LoadEvolved(CurrentDefault, Evolve, MergeOverDefault);
+    private LauncherState Load()
+    {
+        // _file is readonly — the lock below guards persistence, not the reference
+        // ReSharper disable InconsistentlySynchronizedField
+        return _file.LoadEvolved(CurrentDefault, Evolve, MergeOverDefault);
+        // ReSharper restore InconsistentlySynchronizedField
+    }
 
     /// <summary>The fold: normalizes the inner scalars of the sub-records (the materializing
     /// constructor of <see cref="LauncherState"/> has already re-created absent domains).</summary>
