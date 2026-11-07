@@ -51,16 +51,24 @@ public static class MigrationEndpoints
         api.WithTags("Migration");
         var group = api.MapGroup("/migration/prism");
 
-        group.MapGet("/candidates", (FlintPaths paths, MigrationDecisionStore migrationDecisions) =>
-                Results.Ok(PrismSourceDetector.Detect(paths.DataDir, migrationDecisions,
-                    paths.ConfigFile).ToArray()))
+        group.MapGet("/candidates", (PrismSourceCatalog catalog) =>
+                Results.Ok(catalog.Detect().ToArray()))
             .Produces<PrismSourceDetector.PrismSourceCandidate[]>();
 
-        group.MapGet("/plan", (FlintPaths paths, string source, string? mode) =>
+        group.MapGet("/plan", (PrismSourceCatalog catalog, FlintPaths paths, string source, string? mode) =>
         {
             if (!TryParseMode(mode, out var importMode, out var error))
             {
                 return ApiJson.Error("invalid_mode", error, 400);
+            }
+
+            // the plan view enumerates a directory's full inventory — a raw path here is an
+            // arbitrary-directory probe primitive, so the source must be one of the detected
+            // candidates (see /candidates)
+            if (!catalog.IsKnownSource(source))
+            {
+                return ApiJson.Error("invalid_source",
+                    $"source directory '{source}' is not a detected migration candidate", 400);
             }
 
             if (!Directory.Exists(source))
@@ -78,7 +86,7 @@ public static class MigrationEndpoints
                 plan.ToArray()));
         }).Produces<PrismImportPlanResponse>();
 
-        group.MapPost("/", async (FlintPaths paths, MigrationDecisionStore migrationDecisions,
+        group.MapPost("/", async (PrismSourceCatalog catalog, FlintPaths paths, MigrationDecisionStore migrationDecisions,
             PrismImportCompletion completion, FlintTaskRegistry registry, PrismImportRequest request) =>
         {
             if (!TryParseMode(request.Mode, out var importMode, out var error))
@@ -106,6 +114,14 @@ public static class MigrationEndpoints
 
             if (request.DryRun)
             {
+                // the dry-run preview is the same full-inventory enumeration as /plan — the
+                // same probe primitive, the same candidate gate
+                if (!catalog.IsKnownSource(request.Source))
+                {
+                    return ApiJson.Error("invalid_source",
+                        $"source directory '{request.Source}' is not a detected migration candidate", 400);
+                }
+
                 var plan = PrismImportPlanner.Plan(sourceDir, paths.DataDir, importMode);
                 return Results.Ok(new PrismImportDryRunResponse(
                     DryRun: true,

@@ -49,7 +49,8 @@ public static class WebHostBuilder
         AtLauncherApi? atlauncher = null,
         FtbApi? ftb = null,
         AuthEndpointsOptions? auth = null,
-        FlintPaths? paths = null)
+        FlintPaths? paths = null,
+        IReadOnlyList<AbsolutePath>? migrationSourceParents = null)
     {
         // the five-root layout; tests override to point InstallRoot (the jars/ lookup)
         // at a fixture root — the former JavaUtils.LauncherRootPath static test hook
@@ -295,6 +296,10 @@ public static class WebHostBuilder
         builder.Services.AddSingleton<DeviceCodeSessionStore>();
         builder.Services.AddSingleton<JavaScanService>();
         builder.Services.AddSingleton<PrismImportCompletion>();
+        // the migration planning gate: the candidates the read/planning endpoints accept
+        // (tests inject a sandbox root through migrationSourceParents)
+        builder.Services.AddSingleton(new PrismSourceCatalog(
+            paths, migrationDecisions, migrationSourceParents ?? PrismSourceDetector.DefaultParents()));
         builder.Services.AddSingleton<NetConfigApplier>();
         builder.Services.AddSingleton<DirSettingsApplier>();
         builder.Services.AddSingleton(apiAuth);
