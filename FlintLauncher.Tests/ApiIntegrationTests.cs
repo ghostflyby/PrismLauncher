@@ -633,13 +633,17 @@ public class FlintApiIntegrationTests
                     await second.Content.ReadAsStringAsync())
                 .RootElement.GetProperty("error").GetProperty("code").GetString());
 
-            // AutoProceed is false for API launches: the task parks in "waiting" --------
-            var waiting = await PollTaskState(client, taskId, "waiting", TimeSpan.FromSeconds(30));
-            Assert.Equal("launch", waiting.GetProperty("kind").GetString());
-
-            // premature abort endpoint exists; proceed opens the gate -------------------
+            // AutoProceed is false for API launches: the task parks once per gate — the
+            // instance-update progress gate first, then the launch-confirmation gate
+            var updateGate = await PollTaskState(client, taskId, "waiting", TimeSpan.FromSeconds(30));
+            Assert.Equal("launch", updateGate.GetProperty("kind").GetString());
             var proceed = await client.PostAsJsonAsync($"/api/v1/tasks/{taskId}/proceed", new { });
             proceed.EnsureSuccessStatusCode();
+
+            var launchGate = await PollTaskState(client, taskId, "waiting", TimeSpan.FromSeconds(30));
+            Assert.Equal("launch", launchGate.GetProperty("kind").GetString());
+            var proceed2 = await client.PostAsJsonAsync($"/api/v1/tasks/{taskId}/proceed", new { });
+            proceed2.EnsureSuccessStatusCode();
 
             var done = await PollTaskState(client, taskId, "succeeded", TimeSpan.FromSeconds(30));
 
