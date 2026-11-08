@@ -17,6 +17,7 @@ using FlintLauncher.Core.Secrets;
 using FlintLauncher.Core.Settings;
 using FlintLauncher.ExternalApi.Flame;
 using FlintLauncher.ExternalApi.Modrinth;
+using FlintLauncher.ExternalApi.Paste;
 using FlintLauncher.Web;
 using FlintLauncher.Web.Services;
 using TruePath;
@@ -102,7 +103,7 @@ public class CoverageFixCoreTests
         Assert.False(Variant.AsBool(store.Get("SkipModpackUpdatePrompt")));
         Assert.False(Variant.AsBool(store.Get("ShowModIncompat")));
         // paste defaults (registerSettings "HACK" block: mclo.gs)
-        Assert.Equal((int)PasteUpload.PasteType.Mclogs, Variant.AsInt(store.Get("PastebinType")));
+        Assert.Equal((int)PasteType.Mclogs, Variant.AsInt(store.Get("PastebinType")));
         Assert.Equal("", Variant.AsString(store.Get("PastebinCustomAPIBase")));
 
         // every registry key resolves (FlintConfigKeys) and the store round-trips a write

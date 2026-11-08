@@ -10,18 +10,18 @@
 // small, so the flow is synchronous: 201 with the committed instance, 500 creation_failed
 // with the failure reason otherwise).
 //
-// The Technic client is per-host state (TechnicApi — the headless equivalent of the C++
+// The Technic client is per-host state (TechnicClient — the headless equivalent of the C++
 // BuildConfig.TECHNIC_API_BASE_URL constant). The optional `serverUrl` (query param on the
 // GETs, body field on the install) selects a per-request derived client instead of mutating
 // the shared one, so an override can never leak into other requests (and needs no restore).
 
-using System.Text.Json;
-using System.Text.Json.Nodes;
+using System.Net;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.Technic;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
+using FlintLauncher.ExternalApi.Technic;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.Services;
 using TruePath;
@@ -36,23 +36,23 @@ public static class TechnicEndpoints
         // ------------------------------------------------- modplatform/technic/search
         // ListModel::performSearch: a query selects the search URL, an empty one trending
         // (GET /modplatform/technic/trending below). Results map through
-        // TechnicApi.LoadSearchResults (the "vanilla" slug exclusion included).
-        api.MapGet("/modplatform/technic/search", async Task<IResult> (TechnicApi technic, string query = "",
-                    string? serverUrl = null) =>
-                await SearchAsync(string.IsNullOrWhiteSpace(query) ? "" : query.Trim(), serverUrl, technic))
+        // TechnicPackIndex.LoadSearchResults (the "vanilla" slug exclusion included).
+        api.MapGet("/modplatform/technic/search", async Task<IResult> (TechnicClient technic, HttpClient http,
+                    string query = "", string? serverUrl = null) =>
+                await SearchAsync(string.IsNullOrWhiteSpace(query) ? "" : query.Trim(), serverUrl, technic, http))
             .Produces<TechnicSearchResultView[]>();
 
         // ----------------------------------------------- modplatform/technic/trending
-        api.MapGet("/modplatform/technic/trending", async Task<IResult> (TechnicApi technic,
+        api.MapGet("/modplatform/technic/trending", async Task<IResult> (TechnicClient technic, HttpClient http,
                     string? serverUrl = null) =>
-                await SearchAsync("", serverUrl, technic))
+                await SearchAsync("", serverUrl, technic, http))
             .Produces<TechnicSearchResultView[]>();
 
         // --------------------------------------------- modplatform/technic/modpack/{slug}
         // TechnicPage::suggestCurrent's metadata step (+ metadataLoaded's Solder build
         // listing for Solder packs, with the "fall back to the current version" rule).
-        api.MapGet("/modplatform/technic/modpack/{slug}", async Task<IResult> (string slug, TechnicApi technic,
-            string? serverUrl = null) =>
+        api.MapGet("/modplatform/technic/modpack/{slug}", async Task<IResult> (string slug, TechnicClient technic,
+            HttpClient http, string? serverUrl = null) =>
         {
             if (string.IsNullOrWhiteSpace(slug))
             {
@@ -65,18 +65,22 @@ public static class TechnicEndpoints
                 return hookError;
             }
 
-            var (metaError, metaFailReason, metaBody) = await FetchAsync(technicApi.PackMetadataUrl(slug), technicApi.Http);
-            if (metaError is not null)
+            TechnicMetadataJson? metadata;
+            try
+            {
+                metadata = await technicApi.Packs.Metadata(slug).FetchAsync(http);
+            }
+            catch (TechnicApiException e)
             {
                 // an upstream 404 is an unknown slug (the REST mapping of the C++ page's
                 // failed metadata step); everything else stays a gateway failure
-                return metaFailReason.Contains("HTTP status 404", StringComparison.Ordinal)
+                return e.InnerException is HttpRequestException { StatusCode: HttpStatusCode.NotFound }
                     ? ApiJson.NotFound("pack_not_found", $"no Technic pack '{slug}'")
-                    : metaError;
+                    : ApiJson.Error("technic_unavailable", $"technic request failed: {e.Message}", 502);
             }
 
             var pack = new TechnicModpack { Slug = slug };
-            if (!TechnicApi.LoadPackMetadata(metaBody, pack))
+            if (!TechnicPackIndex.LoadPackMetadata(metadata, pack))
             {
                 // LoadPackMetadata returns false when the payload has neither a url nor a
                 // solder key — an unknown slug in practice (the C++ warns and bails)
@@ -91,9 +95,16 @@ public static class TechnicEndpoints
             string? latest = null;
             if (solderUrl is not null)
             {
-                var (solderError, _, solderBody) = await FetchAsync(
-                    TechnicApi.SolderPackUrl(solderUrl, slug), technicApi.Http);
-                var listing = solderError is null ? TechnicApi.LoadSolderPack(solderBody) : null;
+                SolderPack? listing;
+                try
+                {
+                    listing = await technicApi.Solder.Pack(solderUrl, slug).FetchAsync(http);
+                }
+                catch (TechnicApiException)
+                {
+                    listing = null;
+                }
+
                 if (listing is not null)
                 {
                     versions.AddRange(listing.Builds);
@@ -112,9 +123,11 @@ public static class TechnicEndpoints
                 versions.Add(pack.CurrentVersion);
             }
 
+            // the metadata payload's displayName (or raw name) merges in like the search-hit
+            // name upstream; the slug is the fallback
             return Results.Ok(new TechnicPackView(
                 pack.Slug,
-                DisplayName(metaBody) ?? slug,
+                metadata?.DisplayName ?? metadata?.Name ?? slug,
                 pack.IsSolder,
                 solderUrl ?? pack.Url,
                 pack.MinecraftVersion,
@@ -129,7 +142,7 @@ public static class TechnicEndpoints
 
         // ------------------------------------------------- modplatform/technic/install
         api.MapPost("/modplatform/technic/install", async Task<IResult> (
-            TechnicInstallRequest request, TechnicApi technic, InstanceList instances,
+            TechnicInstallRequest request, TechnicClient technic, HttpClient http, InstanceList instances,
             InstanceMutationLock instanceLock, HttpMetaCache metaCache) =>
         {
             // two request shapes: {url, minecraftVersion?} (zip download) or
@@ -179,7 +192,7 @@ public static class TechnicEndpoints
                 if (zipUrl.Length != 0)
                 {
                     var packUri = new Uri(zipUrl, UriKind.Absolute);
-                    task = new SingleZipPackInstallTask(packUri, request.MinecraftVersion ?? "", technic.Http)
+                    task = new SingleZipPackInstallTask(packUri, request.MinecraftVersion ?? "", http)
                     {
                         MetaCache = metaCache,
                         Group = request.Group ?? "",
@@ -195,7 +208,7 @@ public static class TechnicEndpoints
                     {
                         // no build given: resolve the Solder listing's default (the version
                         // box preselects the recommended build, like TechnicPage)
-                        var (resolveError, resolved) = await ResolveDefaultBuildAsync(technicApi, solder, slug);
+                        var (resolveError, resolved) = await ResolveDefaultBuildAsync(technicApi, http, solder, slug);
                         if (resolveError is not null)
                         {
                             return resolveError;
@@ -205,7 +218,7 @@ public static class TechnicEndpoints
                     }
 
                     task = new SolderPackInstallTask(new Uri(solder), slug, build,
-                        request.MinecraftVersion ?? "", technic.Http)
+                        request.MinecraftVersion ?? "", http)
                     {
                         Group = request.Group ?? "",
                     };
@@ -252,9 +265,9 @@ public static class TechnicEndpoints
     // ------------------------------------------------------------------ helpers
 
     /// <summary>The request's Technic client: the shared one, or — with a `serverUrl`
-    /// override — a derived client (same net stack and API build), leaving the shared
-    /// instance untouched. Returns the error result for a malformed override.</summary>
-    private static TechnicApi ResolveApi(TechnicApi technic, string? serverUrl, out IResult? error)
+    /// override — a derived client (same API build), leaving the shared instance untouched.
+    /// Returns the error result for a malformed override.</summary>
+    private static TechnicClient ResolveApi(TechnicClient technic, string? serverUrl, out IResult? error)
     {
         error = null;
         if (string.IsNullOrWhiteSpace(serverUrl))
@@ -271,18 +284,19 @@ public static class TechnicEndpoints
             return technic;
         }
 
-        // the URL builders concatenate directly onto the base, so keep the slash
-        return new TechnicApi(technic.Http)
+        // the operations concatenate directly onto the base, so keep the slash
+        return new TechnicClient(new TechnicClientOptions
         {
             BaseUrl = trimmed.EndsWith('/') ? trimmed : trimmed + "/",
-            ApiBuild = technic.ApiBuild,
-        };
+            ApiBuild = technic.Options.ApiBuild,
+        });
     }
 
     /// <summary>The search/trending pass-through shared by the two GET endpoints: the
-    /// TechnicApi URL builder (empty term = trending), then LoadSearchResults mapped to
+    /// term's search operation (empty term = trending), then LoadSearchResults mapped to
     /// [{id, name, displayName?, iconUrl}].</summary>
-    private static async Task<IResult> SearchAsync(string term, string? serverUrl, TechnicApi technic)
+    private static async Task<IResult> SearchAsync(string term, string? serverUrl, TechnicClient technic,
+        HttpClient http)
     {
         var technicApi = ResolveApi(technic, serverUrl, out var hookError);
         if (hookError is not null)
@@ -290,93 +304,49 @@ public static class TechnicEndpoints
             return hookError;
         }
 
-        var (url, mode) = technicApi.SearchUrl(term);
-        string body;
+        TechnicSearchResponse response;
         try
         {
-            body = await FlintHttp.GetStringAsync(technicApi.Http,
-                new HttpRequestMessage(HttpMethod.Get, url));
+            response = await technicApi.Search.ForTerm(term).FetchAsync(http);
         }
-        catch (FlintHttpException e)
+        catch (TechnicApiException e)
         {
             return ApiJson.Error("technic_unavailable",
-                $"technic search failed: {e.Reason}", 502);
+                $"technic search failed: {e.Message}", 502);
         }
 
-        var packs = TechnicApi.LoadSearchResults(body, mode);
+        var packs = TechnicPackIndex.LoadSearchResults(response);
         // LoadSearchResults maps the single-pack mode's displayName into Name (the
         // displayed name); the list mode only knows "name"
         return Results.Ok(packs.Select(pack => new TechnicSearchResultView(
             pack.Slug,
             pack.Name,
-            mode == TechnicSearchMode.Single ? pack.Name : null,
+            response.Mode == TechnicSearchMode.Single ? pack.Name : null,
             pack.LogoUrl == "null" ? null : pack.LogoUrl)).ToArray());
-    }
-
-    /// <summary>Fetches a Technic/Solder URL; fetch failures map to the uniform 502 error
-    /// envelope, success yields the raw body for the caller's parser.</summary>
-    private static async Task<(IResult? Error, string FailReason, string Body)> FetchAsync(
-        string url, HttpClient http)
-    {
-        try
-        {
-            var body = await FlintHttp.GetStringAsync(http,
-                new HttpRequestMessage(HttpMethod.Get, url));
-            return (null, "", body);
-        }
-        catch (FlintHttpException e)
-        {
-            return (ApiJson.Error("technic_unavailable",
-                $"technic request failed: {e.Reason}", 502), e.Reason, "");
-        }
     }
 
     /// <summary>The Solder listing's default build (recommended, then latest, then the first
     /// listed) — an error result when the listing is unusable (500 creation_failed, like the
     /// install's own failure surface).</summary>
     private static async Task<(IResult? Error, string Build)> ResolveDefaultBuildAsync(
-        TechnicApi api, string solderUrl, string slug)
+        TechnicClient api, HttpClient http, string solderUrl, string slug)
     {
-        var (_, failReason, body) = await FetchAsync(TechnicApi.SolderPackUrl(solderUrl, slug), api.Http);
-        if (failReason.Length != 0)
+        SolderPack? listing;
+        try
+        {
+            listing = await api.Solder.Pack(solderUrl, slug).FetchAsync(http);
+        }
+        catch (TechnicApiException e)
         {
             return (ApiJson.Error("creation_failed",
-                $"fetching the Solder pack listing failed: {failReason}", 500), "");
+                $"fetching the Solder pack listing failed: {e.Message}", 500), "");
         }
 
-        var listing = TechnicApi.LoadSolderPack(body);
         var build = NullIfEmpty(listing?.Recommended) ?? NullIfEmpty(listing?.Latest) ??
             listing?.Builds.FirstOrDefault();
         return string.IsNullOrEmpty(build)
             ? (ApiJson.Error("creation_failed", $"the Solder pack '{slug}' has no builds", 500), "")
             : (null, build);
-    }
-
-    /// <summary>The displayName (or raw name) property of a Platform metadata payload, when
-    /// present (the metadata endpoint merges it in like the search-hit name upstream).</summary>
-    private static string? DisplayName(string body)
-    {
-        try
-        {
-            if (JsonNode.Parse(body) is not JsonObject obj)
-            {
-                return null;
-            }
-
-            foreach (var key in new[] { "displayName", "name" })
-            {
-                if (obj[key] is JsonValue value && value.TryGetValue<string>(out var str))
-                {
-                    return str;
-                }
-            }
-        }
-        catch (JsonException)
-        {
-            // already surfaced through the metadata parse; the name falls back to the slug
-        }
-
-        return null;
     }
 
     private static string? NullIfEmpty(string? value) => string.IsNullOrEmpty(value) ? null : value;

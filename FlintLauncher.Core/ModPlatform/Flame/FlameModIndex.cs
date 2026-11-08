@@ -148,17 +148,14 @@ public static class FlameMod
     /// <summary>Port of FlameMod::loadIndexedPackVersion.</summary>
     public static IndexedVersion LoadIndexedPackVersion(FlameModFile dto)
     {
-        // a missing gameVersions member is a require failure; a non-string element reads as
-        // "" like the former AsString fallback (and simply misses every branch below)
-        if (dto.GameVersions is not { ValueKind: JsonValueKind.Array } gameVersionsNode)
+        if (dto.GameVersions is not { } gameVersions)
         {
             throw new JsonException("'gameVersions' is not an array");
         }
 
         var file = new IndexedVersion();
-        foreach (var mcVer in gameVersionsNode.EnumerateArray())
+        foreach (var str in gameVersions)
         {
-            var str = mcVer.ValueKind == JsonValueKind.String ? mcVer.GetString() ?? "" : "";
 
             if (str.Contains('.'))
             {

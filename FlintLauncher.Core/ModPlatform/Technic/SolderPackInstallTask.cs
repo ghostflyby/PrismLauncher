@@ -20,10 +20,10 @@
 //     See the License for the specific language governing permissions and
 //     limitations under the License.
 //
-// Port of modplatform/technic/SolderPackInstallTask.{h,cpp} (+ SolderPackManifest.{h,cpp} is
-// in SolderPackManifest.cs): resolve {solder}/modpack/{pack}/{build}, download every mod file
-// (md5-verified), extract all of them into the staging folder's minecraft/ directory and run
-// the TechnicPackProcessor (isSolder=true).
+// Port of modplatform/technic/SolderPackInstallTask.{h,cpp} (the Solder models are in
+// FlintLauncher.ExternalApi.Technic): resolve {solder}/modpack/{pack}/{build}, download every
+// mod file (md5-verified), extract all of them into the staging folder's minecraft/
+// directory and run the TechnicPackProcessor (isSolder=true).
 //
 // Deviation (headless port): the C++ downloads into a QTemporaryDir; the port uses a
 // temporary folder under the system temp path that is removed afterwards.
@@ -34,6 +34,7 @@ using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
+using FlintLauncher.ExternalApi.Technic;
 using TruePath;
 using TruePath.SystemIo;
 
@@ -48,34 +49,27 @@ public sealed class SolderPackInstallTask(Uri solderUrl, string pack, string ver
     {
         EmitStatus("Resolving modpack files");
 
-        var sourceUrl = TechnicApi.SolderBuildUrl(solderUrl.ToString(), pack, version);
-        string listing;
-        try
-        {
-            listing = await FlintHttp.GetStringAsync(http,
-                new HttpRequestMessage(HttpMethod.Get, sourceUrl), cancellationToken);
-        }
-        catch (FlintHttpException e)
-        {
-            throw new InvalidOperationException(e.Reason);
-        }
-
-        await FileListSucceeded(listing, cancellationToken);
-    }
-
-    private async Task FileListSucceeded(string response, CancellationToken cancellationToken)
-    {
-        EmitStatus("Downloading modpack");
-
         SolderPackBuild build;
         try
         {
-            build = TechnicApi.LoadSolderPackBuild(response);
+            build = await new TechnicSolderBuildQuery(solderUrl.ToString(), pack, version)
+                .FetchAsync(http, cancellationToken);
         }
-        catch (JsonException e)
+        catch (TechnicApiException e) when (e.InnerException is JsonException)
         {
-            throw new InvalidOperationException("Could not understand pack manifest:\n" + e.Message);
+            throw new InvalidOperationException("Could not understand pack manifest:\n" + e.Message, e);
         }
+        catch (TechnicApiException e)
+        {
+            throw new InvalidOperationException(e.Message, e);
+        }
+
+        await FileListSucceeded(build, cancellationToken);
+    }
+
+    private async Task FileListSucceeded(SolderPackBuild build, CancellationToken cancellationToken)
+    {
+        EmitStatus("Downloading modpack");
 
         if (build.Minecraft.Length != 0)
         {

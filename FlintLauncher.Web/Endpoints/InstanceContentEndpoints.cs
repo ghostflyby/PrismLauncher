@@ -13,6 +13,7 @@ using FlintLauncher.Core.Minecraft.GameOptions;
 using FlintLauncher.Core.Minecraft.Resources;
 using FlintLauncher.Core.Minecraft.Worlds;
 using FlintLauncher.Core.Screenshots;
+using FlintLauncher.ExternalApi.Imgur;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.OpenApi;
 using FlintLauncher.Web.Services;
@@ -650,7 +651,7 @@ public static class InstanceContentEndpoints
         // also creates an album (the C++ SequentialTask shape)
         api.MapPost("/instances/{id}/screenshots/upload", async (string id,
             ScreenshotUploadRequest? request, InstanceList instances, InstanceMutationLock instanceLock,
-            ImgurApi imgur, FlintTaskRegistry registry) =>
+            ImgurClient imgur, HttpClient http, FlintTaskRegistry registry) =>
         {
             if (request?.Names is null || request.Names.Count == 0)
             {
@@ -679,15 +680,23 @@ public static class InstanceContentEndpoints
                 }
 
                 // test/hermetic hook: the imgur endpoint + client id are overridable like the
-                // news feed URL
+                // news feed URL; an override derives a per-request client, the shared one stays
+                // untouched
                 var baseUrl = Environment.GetEnvironmentVariable("FLINT_IMGUR_BASE_URL");
                 var clientId = Environment.GetEnvironmentVariable("FLINT_IMGUR_CLIENT_ID");
+                var client = baseUrl is null && clientId is null
+                    ? imgur
+                    : new ImgurClient(new ImgurClientOptions
+                    {
+                        BaseUrl = baseUrl ?? imgur.Options.BaseUrl,
+                        ClientId = clientId ?? imgur.Options.ClientId,
+                    });
 
                 // ImgurAPI::makeUpload per file; more than one also runs ImgurAPI::makeAlbum.
                 // Sequential by design: the album needs the delete hashes the uploads leave.
-                var uploads = shots.Select(shot => imgur.MakeUpload(shot, baseUrl, clientId)).ToArray();
+                var uploads = shots.Select(shot => new ImgurUpload(shot, client, http)).ToArray();
                 var album = shots.Count > 1
-                    ? imgur.MakeAlbum(new ImgurApi.AlbumResult(), shots, baseUrl, clientId)
+                    ? new ImgurAlbumCreation(new ImgurAlbumResult(), shots, client, http)
                     : null;
 
                 var entry = registry.Start("screenshots-upload", handle => handle.RunAsync(async ct =>

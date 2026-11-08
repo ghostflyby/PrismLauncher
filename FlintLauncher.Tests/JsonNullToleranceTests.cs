@@ -20,8 +20,8 @@ using System.Text.Json.Nodes;
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Meta;
 using FlintLauncher.Core.Minecraft;
-using FlintLauncher.Core.ModPlatform.AtLauncher;
-using FlintLauncher.Core.ModPlatform.Technic;
+using FlintLauncher.ExternalApi.AtLauncher;
+using FlintLauncher.ExternalApi.Technic;
 using TruePath;
 using Xunit;
 using MetaIndex = FlintLauncher.Core.Meta.Index;
@@ -38,7 +38,7 @@ public class JsonNullToleranceTests
     [Fact]
     public void Atl_Configs_MissingSha1_FailsTheManifest()
     {
-        var e = Assert.Throws<JsonException>(() => AtLauncherApi.LoadPackVersion(
+        var e = Assert.Throws<JsonException>(() => AtLauncherJson.LoadPackVersion(
             """{"version":"1","minecraft":"1.12.2","noConfigs":false,"configs":{"filesize":10}}"""));
         Assert.Equal("'sha1' is not a string", e.Message);
     }
@@ -46,15 +46,15 @@ public class JsonNullToleranceTests
     [Fact]
     public void Atl_Loader_MissingType_FailsTheManifest()
     {
-        var e = Assert.Throws<JsonException>(() => AtLauncherApi.LoadPackVersion(
+        var e = Assert.Throws<JsonException>(() => AtLauncherJson.LoadPackVersion(
             """{"version":"1","minecraft":"1.12.2","noConfigs":true,"loader":{"choose":false,"metadata":{"latest":true}}}"""));
-        Assert.Equal("'type' is not a string", e.Message);
+        Assert.StartsWith("JSON response from ATLauncher: Error parsing JSON:", e.Message);
     }
 
     [Fact]
     public void Atl_ModDecomp_WithoutDecompFile_FailsTheManifest()
     {
-        var e = Assert.Throws<JsonException>(() => AtLauncherApi.LoadPackVersion(
+        var e = Assert.Throws<JsonException>(() => AtLauncherJson.LoadPackVersion(
             """
             {"version":"1","minecraft":"1.12.2","noConfigs":true,
              "mods":[{"name":"D","version":"1","url":"u","file":"f.jar","md5":"m",
@@ -68,7 +68,7 @@ public class JsonNullToleranceTests
     [Fact]
     public void Solder_Build_NullMinecraft_FailsWithTheRequireText()
     {
-        var e = Assert.Throws<JsonException>(() => TechnicApi.LoadSolderPackBuild(
+        var e = Assert.Throws<JsonException>(() => TechnicJson.LoadSolderPackBuild(
             """{"minecraft":null,"mods":[]}"""));
         Assert.Equal("'minecraft' is not a string", e.Message);
     }
@@ -76,7 +76,7 @@ public class JsonNullToleranceTests
     [Fact]
     public void Solder_Build_NullModElement_FailsAsAnObjectCheck()
     {
-        var e = Assert.Throws<JsonException>(() => TechnicApi.LoadSolderPackBuild(
+        var e = Assert.Throws<JsonException>(() => TechnicJson.LoadSolderPackBuild(
             """{"minecraft":"1.0","mods":[null]}"""));
         Assert.Equal("Value is not an object", e.Message);
     }

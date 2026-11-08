@@ -24,20 +24,18 @@
 
 using FlintLauncher.Core.Auth;
 using FlintLauncher.Core.Net;
+using FlintLauncher.ExternalApi.Mojang;
 
 namespace FlintLauncher.Core.Skins;
 
 public static class SkinDelete
 {
-    /// <summary>Port of SkinDelete::delete(token); failures surface as
-    /// <see cref="FlintHttpException"/> (the C++ NetRequest status gate).</summary>
+    /// <summary>Port of SkinDelete::delete(token); failures (the C++ NetRequest status gate
+    /// among them) surface as <see cref="MojangApiException"/>.</summary>
     public static Task DeleteAsync(string token, AuthEndpointsOptions? auth = null,
         CancellationToken cancellationToken = default)
     {
         var options = auth ?? new AuthEndpointsOptions();
-        var url = options.MinecraftServices.TrimEnd('/') + "/minecraft/profile/skins/active";
-        var message = new HttpRequestMessage(HttpMethod.Delete, url);
-        message.Headers.TryAddWithoutValidation("Authorization", $"Bearer {token}");
-        return FlintHttp.SendAsync(options.Http, message, cancellationToken);
+        return options.Mojang.MinecraftServices.DeleteSkin(token).FetchAsync(options.Http, cancellationToken);
     }
 }

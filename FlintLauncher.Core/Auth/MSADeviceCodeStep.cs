@@ -29,9 +29,8 @@
 // Finished report) leaves the flow hanging, exactly like the C++ MSADeviceCodeStep::abort() —
 // in practice the server's expired_token error is what surfaces to the user.
 
-using System.Text;
 using System.Text.Json;
-using System.Text.Json.Nodes;
+using FlintLauncher.ExternalApi.Mojang;
 
 namespace FlintLauncher.Core.Auth;
 
@@ -60,7 +59,7 @@ public sealed class MsaDeviceCodeStep(AccountData data, AuthEndpointsOptions? au
 
     public override async Task PerformAsync(CancellationToken cancellationToken)
     {
-        _clientId = _auth.MsaClientId;
+        _clientId = _auth.Mojang.Options.MsaClientId;
         await RequestDeviceAuthorization(cancellationToken).ConfigureAwait(false);
         while (!_isAborted && _expirationUtc is { } expiration)
         {
@@ -83,98 +82,87 @@ public sealed class MsaDeviceCodeStep(AccountData data, AuthEndpointsOptions? au
 
     private async Task RequestDeviceAuthorization(CancellationToken cancellationToken)
     {
-        var payload = FormEncode(("client_id", _clientId), ("scope", "XboxLive.SignIn XboxLive.offline_access"));
-        var response = await AuthStepHttp.SendAsync(new AuthStepRequest
+        try
         {
-            Url = new Uri(_auth.MsaDeviceCode),
-            Body = payload,
-            Headers = FormHeaders,
-            AutoRetry = true,
-        }, _auth.Http, cancellationToken).ConfigureAwait(false);
+            var authorization = await AuthStepHttp.SendAsync(
+                _auth.Mojang.Microsoft.DeviceAuthorization(_clientId),
+                _auth.Http, autoRetry: true, cancellationToken).ConfigureAwait(false);
 
-        if (!response.Success)
-        {
-            EmitFinished(AccountTaskState.FailedHard, $"Device authorization failed: {response.ErrorString}");
-            return;
+            // the loader rejects an answer without the codes and the expiry; a stated
+            // interval overrides the client's default
+            if (authorization.Interval is { } interval)
+            {
+                _interval = interval;
+            }
+
+            _deviceCode = authorization.DeviceCode!;
+            AuthorizeWithBrowser?.Invoke(authorization.VerificationUri!, authorization.UserCode!,
+                authorization.ExpiresIn!.Value);
+            _expirationUtc = DateTime.UtcNow.AddSeconds(authorization.ExpiresIn!.Value);
         }
-
-        var rsp = ParseDeviceAuthorizationResponse(response.Body);
-        if (rsp.Error.Length != 0 || rsp.ErrorDescription.Length != 0)
+        catch (MojangApiException e)
         {
-            EmitFinished(AccountTaskState.FailedHard,
-                $"Device authorization failed: {(rsp.ErrorDescription.Length != 0 ? rsp.ErrorDescription : rsp.Error)}");
-            return;
+            var reason = e.InnerException switch
+            {
+                InvalidOperationException refusal => refusal.Message,
+                JsonException => "required fields missing",
+                _ => e.Message,
+            };
+            EmitFinished(AccountTaskState.FailedHard, $"Device authorization failed: {reason}");
         }
-
-        if (rsp.DeviceCode.Length == 0 || rsp.UserCode.Length == 0 || rsp.VerificationUri.Length == 0 || rsp.ExpiresIn == 0)
-        {
-            EmitFinished(AccountTaskState.FailedHard, "Device authorization failed: required fields missing");
-            return;
-        }
-
-        if (rsp.Interval != 0)
-        {
-            _interval = rsp.Interval;
-        }
-
-        _deviceCode = rsp.DeviceCode;
-        AuthorizeWithBrowser?.Invoke(rsp.VerificationUri, rsp.UserCode, rsp.ExpiresIn);
-        _expirationUtc = DateTime.UtcNow.AddSeconds(rsp.ExpiresIn);
     }
 
     private async Task<bool> PollForToken(CancellationToken cancellationToken)
     {
-        var payload = FormEncode(
-            ("client_id", _clientId),
-            ("grant_type", "urn:ietf:params:oauth:grant-type:device_code"),
-            ("device_code", _deviceCode));
-        var response = await AuthStepHttp.SendAsync(new AuthStepRequest
+        MojangTokenAnswer answer;
+        try
         {
-            Url = new Uri(_auth.MsaToken),
-            Body = payload,
-            Headers = FormHeaders,
-        }, _auth.Http, cancellationToken).ConfigureAwait(false);
+            answer = await AuthStepHttp.SendAsync(
+                _auth.Mojang.Microsoft.DeviceToken(_clientId, _deviceCode),
+                _auth.Http, autoRetry: false, cancellationToken).ConfigureAwait(false);
+        }
+        catch (MojangApiException e)
+        {
+            if (e.InnerException is TimeoutException)
+            {
+                // rfc8628#section-3.5
+                // "On encountering a connection timeout, clients MUST unilaterally
+                // reduce their polling frequency before retrying.  The use of an
+                // exponential backoff algorithm to achieve this, such as doubling the
+                // polling interval on each such connection timeout, is RECOMMENDED."
+                _interval *= 2;
+                return false;
+            }
 
-        if (response.Exception is TimeoutException)
-        {
-            // rfc8628#section-3.5
-            // "On encountering a connection timeout, clients MUST unilaterally
-            // reduce their polling frequency before retrying.  The use of an
-            // exponential backoff algorithm to achieve this, such as doubling the
-            // polling interval on each such connection timeout, is RECOMMENDED."
-            _interval *= 2;
+            // a non-2xx answer without an OAuth error object: it failed, so just try again
+            // without increasing the interval
             return false;
         }
 
-        var rsp = ParseAuthenticationResponse(response.Body);
-        if (rsp.Error == "slow_down")
+        if (answer is MojangTokenRefused refusal)
         {
-            // rfc8628#section-3.5
-            // "A variant of 'authorization_pending', the authorization request is
-            // still pending and polling should continue, but the interval MUST
-            // be increased by 5 seconds for this and all subsequent requests."
-            _interval += 5;
-            return false;
-        }
+            if (refusal.Error == "slow_down")
+            {
+                // rfc8628#section-3.5
+                // "A variant of 'authorization_pending', the authorization request is
+                // still pending and polling should continue, but the interval MUST
+                // be increased by 5 seconds for this and all subsequent requests."
+                _interval += 5;
+                return false;
+            }
 
-        if (rsp.Error == "authorization_pending")
-        {
-            // keep trying - rfc8628#section-3.5
-            return false;
-        }
+            if (refusal.Error == "authorization_pending")
+            {
+                // keep trying - rfc8628#section-3.5
+                return false;
+            }
 
-        if (rsp.Error.Length != 0 || rsp.ErrorDescription.Length != 0)
-        {
             EmitFinished(AccountTaskState.FailedHard,
-                $"Device Access failed: {(rsp.ErrorDescription.Length != 0 ? rsp.ErrorDescription : rsp.Error)}");
+                $"Device Access failed: {(refusal.ErrorDescription.Length != 0 ? refusal.ErrorDescription : refusal.Error)}");
             return true;
         }
 
-        if (!response.Success)
-        {
-            return false; // it failed so just try again without increasing the interval
-        }
-
+        var grant = (MojangTokenGranted)answer;
         _expirationUtc = null;
         Data.MsaClientId = _clientId;
         var now = DateTimeOffset.UtcNow;
@@ -182,105 +170,11 @@ public sealed class MsaDeviceCodeStep(AccountData data, AuthEndpointsOptions? au
         // upstream writes QDateTime::currentDateTime() (local time) here, but the consumers
         // (MinecraftAccount refresh check, MsaInteractiveStep) compare against the current
         // instant — a local-time reading silently shifts the expiry by the zone offset
-        Data.MsaToken.NotAfter = now.AddSeconds(rsp.ExpiresIn);
-        Data.MsaToken.Extra = rsp.Extra;
-        Data.MsaToken.RefreshToken = rsp.RefreshToken;
-        Data.MsaToken.Value = rsp.AccessToken;
+        Data.MsaToken.NotAfter = now.AddSeconds(grant.ExpiresIn);
+        Data.MsaToken.Extra = new Dictionary<string, JsonElement>(grant.Extra);
+        Data.MsaToken.RefreshToken = grant.RefreshToken ?? "";
+        Data.MsaToken.Value = grant.AccessToken;
         EmitFinished(AccountTaskState.Working, "Got MSA token");
         return true;
-    }
-
-    private static readonly KeyValuePair<string, string>[] FormHeaders =
-    [
-        new("Content-Type", "application/x-www-form-urlencoded"),
-        new("Accept", "application/json"),
-    ];
-
-    private static string FormEncode(params (string key, string value)[] pairs)
-    {
-        var sb = new StringBuilder();
-        foreach (var (key, value) in pairs)
-        {
-            if (sb.Length > 0)
-            {
-                sb.Append('&');
-            }
-
-            sb.Append(Uri.EscapeDataString(key)).Append('=').Append(Uri.EscapeDataString(value));
-        }
-
-        return sb.ToString();
-    }
-
-    private sealed record DeviceAuthorizationResponse(
-        string DeviceCode,
-        string UserCode,
-        string VerificationUri,
-        int ExpiresIn,
-        int Interval,
-        string Error,
-        string ErrorDescription);
-
-    private static DeviceAuthorizationResponse ParseDeviceAuthorizationResponse(byte[] data)
-    {
-        if (TryParseObject(data) is not { } obj)
-        {
-            return new DeviceAuthorizationResponse("", "", "", 0, 0, "", "");
-        }
-
-        return new DeviceAuthorizationResponse(
-            AccountData.GetString(AccountData.Get(obj, "device_code")),
-            AccountData.GetString(AccountData.Get(obj, "user_code")),
-            AccountData.GetString(AccountData.Get(obj, "verification_uri")),
-            AccountData.EnsureInteger(obj, "expires_in"),
-            AccountData.EnsureInteger(obj, "interval"),
-            AccountData.GetString(AccountData.Get(obj, "error")),
-            AccountData.GetString(AccountData.Get(obj, "error_description")));
-    }
-
-    private sealed record AuthenticationResponse(
-        string AccessToken,
-        string RefreshToken,
-        int ExpiresIn,
-        string Error,
-        string ErrorDescription,
-        Dictionary<string, JsonElement> Extra);
-
-    private static AuthenticationResponse ParseAuthenticationResponse(byte[] data)
-    {
-        if (TryParseObject(data) is not { } obj)
-        {
-            return new AuthenticationResponse("", "", 0, "", "", new Dictionary<string, JsonElement>());
-        }
-
-        var extra = new Dictionary<string, JsonElement>();
-        foreach (var (key, value) in obj)
-        {
-            if (value is not null)
-            {
-                extra[key] = AccountData.ToElement(value);
-            }
-        }
-
-        return new AuthenticationResponse(
-            AccountData.GetString(AccountData.Get(obj, "access_token")),
-            AccountData.GetString(AccountData.Get(obj, "refresh_token")),
-            AccountData.EnsureInteger(obj, "expires_in"),
-            AccountData.GetString(AccountData.Get(obj, "error")),
-            AccountData.GetString(AccountData.Get(obj, "error_description")),
-            extra);
-    }
-
-    /// <summary>QJsonDocument::fromJson equivalent: null object on any parse failure (upstream {} struct).</summary>
-    private static JsonObject? TryParseObject(byte[] data)
-    {
-        try
-        {
-            return JsonNode.Parse(data) as JsonObject;
-        }
-        catch (Exception e) when (e is JsonException or ArgumentException)
-        {
-            return null;
-        }
     }
 }

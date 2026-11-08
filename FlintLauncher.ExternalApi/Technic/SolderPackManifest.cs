@@ -8,9 +8,8 @@
 // except a mod's version (toString() of a missing/junk value -> "", the coercing converter).
 
 using System.Text.Json.Serialization;
-using FlintLauncher.Core.Json;
 
-namespace FlintLauncher.Core.ModPlatform.Technic;
+namespace FlintLauncher.ExternalApi.Technic;
 
 public sealed class SolderPack
 {
@@ -25,9 +24,7 @@ public sealed class SolderPackBuildMod
 {
     public required string Name { get; set; }
 
-    // optional: toString() of a missing/junk value -> ""
-    [JsonConverter(typeof(QtCoercingStringConverter))]
-    public string Version { get; set; } = "";
+    public string? Version { get; set; }
 
     public required string Md5 { get; set; }
 

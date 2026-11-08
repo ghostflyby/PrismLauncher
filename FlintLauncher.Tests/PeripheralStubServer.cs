@@ -125,7 +125,9 @@ internal sealed record CapturedRequest(
     public string BodyAsString => Encoding.UTF8.GetString(Body);
 }
 
-/// <summary>Multipart inspection helpers for the byte-exact body assertions.</summary>
+/// <summary>Multipart inspection helpers: split a body into parts and find ours by field
+/// name — the framing itself belongs to MultipartFormDataContent, not to these
+/// tests.</summary>
 internal static class MultipartAssertions
 {
     public static string BoundaryFromContentType(string contentType)
@@ -133,7 +135,37 @@ internal static class MultipartAssertions
         var marker = "boundary=";
         var index = contentType.IndexOf(marker, StringComparison.Ordinal);
         Assert.True(index >= 0, "no boundary in Content-Type: " + contentType);
-        return contentType[(index + marker.Length)..];
+        var boundary = contentType[(index + marker.Length)..];
+        // MultipartFormDataContent quotes the boundary in the Content-Type
+        return boundary.Trim('"');
+    }
+
+    /// <summary>The payload of the part with the given form field name, null when no such
+    /// part.</summary>
+    public static byte[]? Field(List<(string[] Headers, byte[] Payload)> parts, string name)
+    {
+        foreach (var (headers, payload) in parts)
+        {
+            foreach (var header in headers)
+            {
+                // Content-Disposition: form-data; name=<name> — MultipartFormDataContent
+                // writes the name unquoted
+                var marker = "name=";
+                var index = header.IndexOf(marker, StringComparison.Ordinal);
+                if (index < 0)
+                {
+                    continue;
+                }
+
+                var token = header[(index + marker.Length)..].Split(';')[0].Trim().Trim('"');
+                if (token == name)
+                {
+                    return payload;
+                }
+            }
+        }
+
+        return null;
     }
 
     /// <summary>Splits a multipart body into (headers, payload) parts between the boundary markers.</summary>

@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
 
-using System.Collections.Immutable;
-
 namespace FlintLauncher.Core;
 
 /// <summary>
@@ -84,7 +82,6 @@ public sealed class FlintConfig
     // ---- API credentials --------------------------------------------------------
 
     public string ImgurClientId { get; init; } = "5b97b0713fba4a3";
-    public string ImgurBaseUrl { get; init; } = "https://api.imgur.com/3/";
 
     // The MSA client id is shared by Prism builds per MS identity platform terms of use.
     public string MsaClientId { get; init; } = "c36a9fb6-4f2a-41ff-90bd-ae7cc92031eb";
@@ -96,30 +93,7 @@ public sealed class FlintConfig
 
     // ---- Mod platforms ----------------------------------------------------------
 
-    public string ModrinthStagingUrl { get; init; } = "https://staging-api.modrinth.com/v2";
-    public string ModrinthProdUrl { get; init; } = "https://api.modrinth.com/v2";
-
-    public ImmutableArray<string> ModrinthMrpackHosts { get; init; } =
-    [
-        "cdn.modrinth.com",
-        "github.com",
-        "raw.githubusercontent.com",
-        "gitlab.com",
-    ];
-
-    public string ModrinthDownloadHost { get; init; } = "cdn.modrinth.com";
-
-    public string FlameBaseUrl { get; init; } = "https://api.curseforge.com/v1";
-    public string FlameDownloadHost { get; init; } = "edge.forgecdn.net";
-
-    public string FtbApiBaseUrl { get; init; } = "https://api.feed-the-beast.com/v1/modpacks/public";
     public string LegacyFtbCdnBaseUrl { get; init; } = "https://dist.creeper.host/FTB2/";
-
-    public string AtlDownloadServerUrl { get; init; } = "https://download.nodecdn.net/containers/atl/";
-    public string AtlApiBaseUrl { get; init; } = "https://api.atlauncher.com/v1/";
-
-    public string TechnicApiBaseUrl { get; init; } = "https://api.technicpack.net/";
-    public string TechnicApiBuild { get; init; } = "multimc";
 
     // ---- Native library override names (per-OS, from root CMakeLists.txt) -------
 

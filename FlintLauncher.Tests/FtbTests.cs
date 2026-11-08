@@ -5,14 +5,16 @@
 // version payload parsing, and the end-to-end pack install against the stub servers (instance
 // layout, component ids, files by their path/type, sha1 verification, CurseForge resolution
 // and the blocked file flow) — the Flame stub backs the CurseForge file resolver. Each test
-// suite builds its own FtbApi/FlameClient clients pointed at the stubs (per-instance BaseUrl,
+// suite builds its own FtbClient/FlameClient clients pointed at the stubs (per-instance BaseUrl,
 // nothing process-global to restore).
 
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.ModPlatform.Ftb;
+using FlintLauncher.ExternalApi;
 using FlintLauncher.ExternalApi.Flame;
+using FlintLauncher.ExternalApi.Ftb;
 using FlintLauncher.ExternalApi.Modrinth;
 using Xunit;
 
@@ -23,7 +25,7 @@ public class FtbTests : IDisposable
     private readonly ModrinthClient _modrinthApi;
     private readonly HttpClient _http;
     private readonly FlameClient _flameApi = new();
-    private readonly FtbApi _ftbApi;
+    private readonly FtbClient _ftbApi;
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"flint-ftb-{Guid.NewGuid():N}");
     private readonly TestGlobalSettings _global = new();
     private readonly StubFtbServer _server = new();
@@ -34,7 +36,7 @@ public class FtbTests : IDisposable
     {
         (_modrinthApi, _http) = TestModrinthApi.Unreachable();
         Directory.CreateDirectory(_root);
-        _ftbApi = new FtbApi(TestNet.Http) { BaseUrl = _server.Url };
+        _ftbApi = new FtbClient(new FtbClientOptions { BaseUrl = _server.Url });
         // the FTB install resolves CurseForge-only files through the Flame layer
         _flameApi.Options.BaseUrl = _flameServer.Url;
     }
@@ -73,9 +75,8 @@ public class FtbTests : IDisposable
     {
         _server.ModpacksIndexJson = """{"packs":[42, 43]}""";
 
-        var body = await _ftbApi.FetchModpacksAsync();
+        var packs = await _ftbApi.Packs.All().SendTo(TestNet.Http);
 
-        var packs = FtbApi.LoadModpackIndex(body);
         Assert.Equal(new[] { 42, 43 }, packs);
     }
 
@@ -85,9 +86,7 @@ public class FtbTests : IDisposable
         var fixture = FtbPackFixture.Create();
         _server.Modpacks[FtbPackFixture.PackId.ToString()] = fixture.PackJson;
 
-        var body = await _ftbApi.FetchModpackAsync(FtbPackFixture.PackId);
-
-        var pack = FtbApi.LoadModpack(body);
+        var pack = await _ftbApi.Packs.ById(FtbPackFixture.PackId).SendTo(TestNet.Http);
 
         Assert.Equal(42, pack.Id);
         Assert.Equal("Test FTB Pack", pack.Name);
@@ -119,9 +118,8 @@ public class FtbTests : IDisposable
         var fixture = FtbPackFixture.Create();
         fixture.Register(_server);
 
-        var body = await _ftbApi.FetchVersionAsync(FtbPackFixture.PackId, FtbPackFixture.VersionId);
-
-        var version = FtbApi.LoadVersion(body);
+        var version = await _ftbApi.Packs.Version(FtbPackFixture.PackId, FtbPackFixture.VersionId)
+            .SendTo(TestNet.Http);
 
         Assert.Equal(FtbPackFixture.VersionId, version.Id);
         Assert.Equal(42, version.Parent);
@@ -140,73 +138,69 @@ public class FtbTests : IDisposable
         Assert.False(mod.ServerOnly);
         Assert.Equal(fixture.ModSha1, mod.Sha1);
         // the curseforge pair of the third file was read
-        Assert.Equal(0, version.Files[2].Url.Length);
-        Assert.Equal(123, version.Files[2].Curseforge.ProjectId);
-        Assert.Equal(456, version.Files[2].Curseforge.FileId);
+        Assert.Null(version.Files[2].Url);
+        Assert.Equal(123, version.Files[2].CurseforgeRaw?.ProjectId);
+        Assert.Equal(456, version.Files[2].CurseforgeRaw?.FileId);
         // the server-only flag of the fourth file was read
         Assert.True(version.Files[3].ServerOnly);
     }
 
     [Fact]
-    public void Index_Coercion_TruncatesDoublesAndZeroesJunk()
+    public void Index_Junk_Yields_The_Empty_List()
     {
-        // QJsonValue::toInt() coercion: doubles truncate, non-number junk becomes 0
-        var packs = FtbApi.LoadModpackIndex("""{"packs":[42, 43.9, "x", null, true]}""");
-        Assert.Equal(new[] { 42, 43, 0, 0, 0 }, packs);
+        // a junk element fails the binding, and the dud-index tolerance answers empty
+        Assert.Empty(FtbJson.LoadPackIndex("""{"packs":[42, 43.9, "x", null, true]}"""));
 
         // a missing or non-array "packs" member yields an empty list (no throw)
-        Assert.Empty(FtbApi.LoadModpackIndex("{}"));
-        Assert.Empty(FtbApi.LoadModpackIndex("""{"packs":null}"""));
-        Assert.Empty(FtbApi.LoadModpackIndex("[]"));
+        Assert.Empty(FtbJson.LoadPackIndex("{}"));
+        Assert.Empty(FtbJson.LoadPackIndex("""{"packs":null}"""));
+        Assert.Empty(FtbJson.LoadPackIndex("[]"));
     }
 
     [Fact]
-    public void Manifest_OptionalFieldsDefault_AndCoercions()
+    public void Manifest_OptionalFields_Default_When_Absent()
     {
-        // art/authors/versions/tags are required arrays (empty is fine); the truly optional
-        // fields keep the QJsonValue coercion defaults (toInt() of a missing value -> 0,
-        // toString() -> "") and the optional refreshed truncates a fractional double like
-        // Qt's toInt(), while a required int would reject it
-        var pack = FtbApi.LoadModpack("""
+        // the live pack payload ships no "refreshed" at all; the optional members keep
+        // their defaults, and a present member of the wrong kind fails the read
+        var pack = FtbJson.LoadModpack("""
                                       {"id":7,"name":"P","synopsis":"s","description":"d","type":"public",
-                                       "featured":false,"installs":1,"plays":2,"updated":10,"refreshed":20.7,
+                                       "featured":false,"installs":1,"plays":2,"updated":10,
                                        "art":[],"authors":[],"versions":[],"tags":[]}
                                       """);
         Assert.Equal(10, pack.Updated);
-        Assert.Equal(20, pack.Refreshed); // the optional toInt() truncation
-        // a JSON null optional member also falls back to 0 (HandleNull coercion)
-        var nullRefreshed = FtbApi.LoadModpack("""
-                                              {"id":7,"name":"P","synopsis":"s","description":"d","type":"public",
-                                               "featured":false,"installs":1,"plays":2,"updated":10,"refreshed":null,
-                                               "art":[],"authors":[],"versions":[],"tags":[]}
-                                              """);
-        Assert.Equal(0, nullRefreshed.Refreshed);
+        Assert.Null(pack.Refreshed);
         Assert.Empty(pack.Art);
         Assert.Empty(pack.Authors);
         Assert.Empty(pack.Versions);
         Assert.Empty(pack.Tags);
+
+        Assert.Throws<JsonException>(() => FtbJson.LoadModpack("""
+                                      {"id":7,"name":"P","synopsis":"s","description":"d","type":"public",
+                                       "featured":false,"installs":1,"plays":2,"updated":10,"refreshed":20.7,
+                                       "art":[],"authors":[],"versions":[],"tags":[]}
+                                      """));
     }
 
     [Fact]
     public void Manifest_ErrorMessages_KeepTheCppShapes()
     {
         // parse errors keep the "{what}: Error parsing JSON: ..." wrapper
-        var parseError = Assert.Throws<JsonException>(() => FtbApi.LoadModpack("not json"));
+        var parseError = Assert.Throws<JsonException>(() => FtbJson.LoadModpack("not json"));
         Assert.StartsWith("JSON response from FTB: Error parsing JSON: ", parseError.Message);
 
-        // a non-object root document fails like the old Json::requireObject(doc)
-        var kindError = Assert.Throws<JsonException>(() => FtbApi.LoadModpack("[1,2]"));
-        Assert.Equal("Document is not an object", kindError.Message);
+        // a non-object root document fails through the binding, riding the same wrapper
+        var kindError = Assert.Throws<JsonException>(() => FtbJson.LoadModpack("[1,2]"));
+        Assert.StartsWith("JSON response from FTB: Error parsing JSON: ", kindError.Message);
 
         // a missing required key fails through the model's `required` members and rides the
         // same parse wrapper (deviation: the STJ "missing required properties" text replaced
         // the C++ "'key's parent does not contain 'key'" shape)
-        var missing = Assert.Throws<JsonException>(() => FtbApi.LoadModpack("""{"id":1}"""));
+        var missing = Assert.Throws<JsonException>(() => FtbJson.LoadModpack("""{"id":1}"""));
         Assert.StartsWith("JSON response from FTB: Error parsing JSON: ", missing.Message);
         Assert.Contains("name", missing.Message);
 
         // a non-integer for a required int fails the strict int binding the same way
-        var notInt = Assert.Throws<JsonException>(() => FtbApi.LoadVersion("""
+        var notInt = Assert.Throws<JsonException>(() => FtbJson.LoadVersion("""
                                                                                 {"id":1.5,"parent":0,"name":"n","type":"t",
                                                                                  "installs":0,"plays":0,"updated":0,"specs":{"id":1,"minimum":1,"recommended":1}}
                                                                                 """));
@@ -240,7 +234,7 @@ public class FtbTests : IDisposable
         SetupFlameResolution();
 
         var list = CreateList();
-        var task = new FtbPackInstallTask(FtbApi.LoadModpack(fixture.PackJson), "1.0.0", _modrinthApi, _http, _flameApi, _ftbApi);
+        var task = new FtbPackInstallTask(FtbJson.LoadModpack(fixture.PackJson), "1.0.0", _modrinthApi, _http, _flameApi, _ftbApi);
         task.SetName("FTB Imported");
         task.Icon = "ftb_logo";
         var wrapped = list.WrapInstanceTask(task);
@@ -281,7 +275,7 @@ public class FtbTests : IDisposable
         _server.Downloads["testmod.jar"] = "corrupted payload!!"u8.ToArray();
 
         var list = CreateList();
-        var task = new FtbPackInstallTask(FtbApi.LoadModpack(fixture.PackJson), "1.0.0", _modrinthApi, _http, _flameApi, _ftbApi);
+        var task = new FtbPackInstallTask(FtbJson.LoadModpack(fixture.PackJson), "1.0.0", _modrinthApi, _http, _flameApi, _ftbApi);
         task.SetName("FTB Sha1");
         var wrapped = list.WrapInstanceTask(task);
         await Assert.ThrowsAnyAsync<Exception>(() => wrapped(TestContext.Current.CancellationToken));
@@ -299,7 +293,7 @@ public class FtbTests : IDisposable
         SetupFlameResolution(downloadUrlPath: null);
 
         var list = CreateList();
-        var task = new FtbPackInstallTask(FtbApi.LoadModpack(fixture.PackJson), "1.0.0", _modrinthApi, _http, _flameApi, _ftbApi);
+        var task = new FtbPackInstallTask(FtbJson.LoadModpack(fixture.PackJson), "1.0.0", _modrinthApi, _http, _flameApi, _ftbApi);
         task.SetName("FTB Blocked");
         var wrapped = list.WrapInstanceTask(task);
         var ex = await Assert.ThrowsAnyAsync<Exception>(() => wrapped(TestContext.Current.CancellationToken));
@@ -321,7 +315,7 @@ public class FtbTests : IDisposable
         await File.WriteAllBytesAsync(localPath, _cfBytes);
 
         var list = CreateList();
-        var task = new FtbPackInstallTask(FtbApi.LoadModpack(fixture.PackJson), "1.0.0", _modrinthApi, _http, _flameApi, _ftbApi)
+        var task = new FtbPackInstallTask(FtbJson.LoadModpack(fixture.PackJson), "1.0.0", _modrinthApi, _http, _flameApi, _ftbApi)
         {
             BlockedModLocalFileResolver = _ => localPath,
         };
@@ -343,7 +337,7 @@ public class FtbTests : IDisposable
         fixture.Register(_server);
 
         var list = CreateList();
-        var task = new FtbPackInstallTask(FtbApi.LoadModpack(fixture.PackJson), "no-such-version", modrinth: _modrinthApi, http: _http, ftb: _ftbApi);
+        var task = new FtbPackInstallTask(FtbJson.LoadModpack(fixture.PackJson), "no-such-version", modrinth: _modrinthApi, http: _http, ftb: _ftbApi);
         task.SetName("FTB UnknownVersion");
         var wrapped = list.WrapInstanceTask(task);
         var ex = await Assert.ThrowsAnyAsync<Exception>(() => wrapped(TestContext.Current.CancellationToken));

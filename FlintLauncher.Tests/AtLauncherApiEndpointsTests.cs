@@ -7,13 +7,13 @@
 // AtLauncherPackInstallTask the core tests drive directly) and the failure surface
 // (unknown pack -> 500 creation_failed with the failure cause, validation -> 400).
 //
-// Every host gets its own AtLauncherApi client pointed at the stub (DownloadServerUrl/
+// Every host gets its own AtLauncherClient pointed at the stub (DownloadServerUrl/
 // ApiBaseUrl are per-instance state now, so no [Collection] serialization is needed).
 
 using System.Net;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using FlintLauncher.Core.ModPlatform.AtLauncher;
+using FlintLauncher.ExternalApi.AtLauncher;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -21,16 +21,16 @@ namespace FlintLauncher.Tests;
 public class AtLauncherApiEndpointsTests : IDisposable
 {
     private readonly StubAtlServer _server = new();
-    private readonly AtLauncherApi _api;
+    private readonly AtLauncherClient _api;
 
     public AtLauncherApiEndpointsTests()
     {
         // both URL hooks point at the stub (note the trailing slash like the C++ defaults)
-        _api = new AtLauncherApi(TestNet.Http)
+        _api = new AtLauncherClient(new AtLauncherClientOptions
         {
             DownloadServerUrl = _server.Url + "/",
             ApiBaseUrl = _server.Url + "/",
-        };
+        });
     }
 
     public void Dispose()
@@ -196,7 +196,7 @@ public class AtLauncherApiEndpointsTests : IDisposable
         fixture.Register(_server);
         // a dead base on the injected client forces the request's serverUrl override to be
         // the only working route
-        var api = new AtLauncherApi(TestNet.Http) { DownloadServerUrl = "http://127.0.0.1:9/" };
+        var api = new AtLauncherClient(new AtLauncherClientOptions { DownloadServerUrl = "http://127.0.0.1:9/" });
         await using var host = await FlintApiHost.StartAsync(atlauncher: api);
 
         var post = await host.PostAsync("/api/v1/modplatform/atlauncher/install", new
@@ -208,7 +208,7 @@ public class AtLauncherApiEndpointsTests : IDisposable
         Assert.Equal(HttpStatusCode.Created, post.StatusCode);
 
         // the override is a per-request derived client: the injected client's base is untouched
-        Assert.Equal("http://127.0.0.1:9/", api.DownloadServerUrl);
+        Assert.Equal("http://127.0.0.1:9/", api.Options.DownloadServerUrl);
         Assert.True(File.Exists(Path.Combine(host.DataDir, "instances", fixture.PackName,
             "minecraft", "mods", "required.jar")));
     }

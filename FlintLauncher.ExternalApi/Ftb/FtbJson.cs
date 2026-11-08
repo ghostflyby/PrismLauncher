@@ -22,24 +22,30 @@
 //     See the License for the specific language governing permissions and
 //     limitations under the License.
 //
-// Port of modplatform/ftb/FTBPackManifest.{h,cpp}: the modpacks.ch-style JSON models of the
-// FTB App API — the pack description (Modpack with art/authors/versions/tags) and the
-// version payload (Version with targets[] and files[]). The wire shape is annotated directly
-// on the model properties ([JsonPropertyName] + the QJsonValue-semantics converters of
-// QtConverters); required members use the C# `required` modifier so a missing key fails
-// deserialization, and FtbJsonContext (FtbApi.cs) turns them into source-generated
-// deserialization metadata with RespectNullableAnnotations (a JSON null for a required
-// member is an error, like the former requireIsType reads).
-//
-// Deviations: optional fields keep the QJsonValue coercion defaults through the coercing
-// converters (toInt() of a missing value -> 0, toString() -> ""); Modpack.safeName is a
-// computed property instead of a parsed field.
+// The modpacks.ch-style JSON models of the FTB App API — the pack description (Modpack
+// with art/authors/versions/tags) and the version payload (Version with targets[] and
+// files[]). The wire shape is annotated directly on the model properties
+// ([JsonPropertyName]); required members use the
+// C# `required` modifier so a missing key fails deserialization, and the context turns
+// them into source-generated metadata with RespectNullableAnnotations (a JSON null for a
+// required member is an error). Optional members keep the QJsonValue coercion defaults
+// (toInt() of a missing value -> 0, toString() -> ""); Modpack.SafeName is a computed
+// property instead of a parsed field.
 
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 using System.Text.RegularExpressions;
-using FlintLauncher.Core.Json;
 
-namespace FlintLauncher.Core.ModPlatform.Ftb;
+namespace FlintLauncher.ExternalApi.Ftb;
+
+/// <summary>The /modpack/all wire root; the pack ids coerce like QJsonValue::toInt()
+/// (fractional doubles truncate, junk zeroes) through the packs list converter.</summary>
+public sealed class FtbPackIndexFile
+{
+    public List<int> Packs { get; init; } = [];
+}
 
 /// <summary>Port of FTB::Specs.</summary>
 public sealed class FtbSpecs
@@ -76,9 +82,8 @@ public sealed class FtbArt
 
     public required string Sha1 { get; set; }
 
-    // optional: toInt() of a missing/junk value -> 0
-    [JsonConverter(typeof(QtCoercingIntConverter))]
-    public int Size { get; set; }
+    // absent on the live art payloads
+    public int? Size { get; set; }
 
     public required long Updated { get; set; }
 }
@@ -132,9 +137,8 @@ public sealed partial class FtbModpack
 
     public required long Updated { get; set; }
 
-    // optional: toInt() truncates a fractional double (20.7 -> 20)
-    [JsonConverter(typeof(QtCoercingLongConverter))]
-    public long Refreshed { get; set; }
+    // absent on the live pack payloads
+    public long? Refreshed { get; set; }
 
     public required List<FtbArt> Art { get; init; }
 
@@ -173,14 +177,11 @@ public sealed class FtbVersionTarget
 /// <summary>Port of FTB::VersionFileCurseForge.</summary>
 public sealed class FtbVersionFileCurseForge
 {
-    // optional members of an already-optional object: toInt() of a missing/junk value -> 0
     [JsonPropertyName("project")]
-    [JsonConverter(typeof(QtCoercingIntConverter))]
-    public int ProjectId { get; set; }
+    public required int ProjectId { get; set; }
 
     [JsonPropertyName("file")]
-    [JsonConverter(typeof(QtCoercingIntConverter))]
-    public int FileId { get; set; }
+    public required int FileId { get; set; }
 }
 
 /// <summary>Port of FTB::VersionFile.</summary>
@@ -196,15 +197,12 @@ public sealed class FtbVersionFile
 
     public required string Version { get; set; }
 
-    // optional: toString() of a missing/junk value -> ""
-    [JsonConverter(typeof(QtCoercingStringConverter))]
-    public string Url { get; set; } = "";
+    // CurseForge-hosted files carry no direct url
+    public string? Url { get; set; }
 
     public required string Sha1 { get; set; }
 
-    // optional: toInt() of a missing/junk value -> 0
-    [JsonConverter(typeof(QtCoercingIntConverter))]
-    public int Size { get; set; }
+    public int? Size { get; set; }
 
     [JsonPropertyName("clientonly")]
     public required bool ClientOnly { get; set; }
@@ -216,14 +214,9 @@ public sealed class FtbVersionFile
 
     public required long Updated { get; set; }
 
-    // the optional curseforge object: a missing (or JSON null) member keeps the zero default
+    // absent unless the file is CurseForge-resolved
     [JsonPropertyName("curseforge")]
     public FtbVersionFileCurseForge? CurseforgeRaw { get; init; }
-
-    // [JsonIgnore]: with a naming policy the computed getter's name ("curseforge")
-    // would collide with CurseforgeRaw's explicit wire name
-    [JsonIgnore]
-    public FtbVersionFileCurseForge Curseforge => CurseforgeRaw ?? new();
 }
 
 /// <summary>Port of FTB::Version.</summary>
@@ -243,13 +236,66 @@ public sealed class FtbVersion
 
     public required long Updated { get; set; }
 
-    // optional: toInt() truncates a fractional double (20.7 -> 20)
-    [JsonConverter(typeof(QtCoercingLongConverter))]
-    public long Refreshed { get; set; }
+    // absent on the live version payloads
+    public long? Refreshed { get; set; }
 
     public required FtbSpecs Specs { get; init; }
 
     public required List<FtbVersionTarget> Targets { get; init; }
 
     public required List<FtbVersionFile> Files { get; init; }
+}
+
+[JsonSourceGenerationOptions(RespectNullableAnnotations = true,
+    PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
+[JsonSerializable(typeof(FtbPackIndexFile))]
+[JsonSerializable(typeof(FtbModpack))]
+[JsonSerializable(typeof(FtbVersion))]
+public sealed partial class FtbJsonContext : JsonSerializerContext;
+
+/// <summary>The strict document decode of the FTB payloads: parse with the
+/// "JSON response from FTB: Error parsing JSON: ..." wrapper, guard the object root, then
+/// bind the annotated model — the entry points the operations read responses through and
+/// callers reuse for out-of-band payloads.</summary>
+public static class FtbJson
+{
+    /// <summary>Parses the /modpack/all index: {"packs":[id,...]} -> the pack ids. A
+    /// missing/invalid payload yields an empty list (the dud-index tolerance of the
+    /// former model).</summary>
+    public static List<int> LoadPackIndex(string response)
+    {
+        try
+        {
+            return JsonSerializer.Deserialize(response, FtbJsonContext.Default.FtbPackIndexFile)?.Packs ?? [];
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+    }
+
+    /// <summary>Parses a /modpack/{id} response; binding failures (a missing required key or
+    /// a malformed member) ride the parse wrapper.</summary>
+    public static FtbModpack LoadModpack(string response) =>
+        LoadRootDocument(response, FtbJsonContext.Default.FtbModpack);
+
+    /// <summary>Parses a /modpack/{id}/{versionId} response the same way.</summary>
+    public static FtbVersion LoadVersion(string response) =>
+        LoadRootDocument(response, FtbJsonContext.Default.FtbVersion);
+
+    /// <summary>The shared document binding: deserialize the annotated model, failures
+    /// carrying the parse wrapper (a "null" document binds to null and fails the same
+    /// way).</summary>
+    private static T LoadRootDocument<T>(string json, JsonTypeInfo<T> typeInfo) where T : class
+    {
+        try
+        {
+            return JsonSerializer.Deserialize(json, typeInfo)
+                   ?? throw new JsonException("Document is not an object");
+        }
+        catch (JsonException e)
+        {
+            throw new JsonException("JSON response from FTB: Error parsing JSON: " + e.Message, e);
+        }
+    }
 }

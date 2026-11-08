@@ -8,6 +8,7 @@ using System.Text;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Auth;
 using FlintLauncher.Core.Skins;
+using FlintLauncher.ExternalApi.Mojang;
 using TruePath;
 using Xunit;
 
@@ -23,8 +24,12 @@ public class SkinApiTests : IDisposable
 
     public SkinApiTests()
     {
-        _auth = new AuthEndpointsOptions { MinecraftServices = _server.BaseUrl };
+        _auth = ServicesAt(_server.BaseUrl);
     }
+
+    /// <summary>An auth context whose Minecraft services base is <paramref name="baseUrl"/>.</summary>
+    private static AuthEndpointsOptions ServicesAt(string baseUrl) =>
+        new() { Mojang = new MojangClient(new MojangClientOptions { MinecraftServices = baseUrl }) };
 
     public void Dispose()
     {
@@ -51,36 +56,12 @@ public class SkinApiTests : IDisposable
         Assert.NotNull(recorded);
         Assert.StartsWith("Bearer SKIN_TOKEN", recorded.Headers["Authorization"]);
 
-        var contentType = recorded.Headers["Content-Type"];
-        Assert.StartsWith("multipart/form-data; boundary=", contentType);
-        var boundary = contentType["multipart/form-data; boundary=".Length..];
-
-        var body = recorded.Body;
-        // part 1: the file (Content-Type before Content-Disposition, like the C++ QHttpPart setup)
-        var filePart = $"""
-                        --{boundary}
-                        Content-Type: image/png
-                        Content-Disposition: form-data; name="file"; filename="skin.png"
-
-                        """.ReplaceLineEndings("\r\n");
-        var fileIdx = body.IndexOf(filePart, StringComparison.Ordinal);
-        Assert.True(fileIdx >= 0, "file part header missing:\n" + body);
-        var pngIdx = body.IndexOf(Encoding.UTF8.GetString(pngBytes), StringComparison.Ordinal);
-        Assert.True(pngIdx > fileIdx);
-
-        // part 2: the variant value follows
-        var variantPart = $"""
-
-                           --{boundary}
-                           Content-Disposition: form-data; name="variant"
-
-                           classic
-                           --{boundary}--
-                           """.ReplaceLineEndings("\r\n");
-        Assert.Contains(variantPart, body);
-
-        // the closing delimiter ends the body
-        Assert.EndsWith("--" + boundary + "--\r\n", body);
+        // the upload's fields: the PNG bytes and the model variant
+        var boundary = MultipartAssertions.BoundaryFromContentType(recorded.Headers["Content-Type"]);
+        var parts = MultipartAssertions.SplitParts(Encoding.Latin1.GetBytes(recorded.Body), boundary);
+        Assert.Equal(2, parts.Count);
+        Assert.Equal(pngBytes, MultipartAssertions.Field(parts, "file")!);
+        Assert.Equal("classic", Encoding.UTF8.GetString(MultipartAssertions.Field(parts, "variant")!));
     }
 
     [Fact]
@@ -119,10 +100,10 @@ public class SkinApiTests : IDisposable
     public async Task SkinUpload_Server_Error_Fails_The_Request()
     {
         // the stub answers 404 for unknown paths; point the upload at one
-        var dead = new AuthEndpointsOptions { MinecraftServices = _server.BaseUrl + "/nowhere" };
+        var dead = ServicesAt(_server.BaseUrl + "/nowhere");
 
         var request = SkinUpload.Make("SKIN_TOKEN", [1, 2, 3], "slim", dead);
-        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => request.SendAsync());
+        var failure = await Assert.ThrowsAsync<MojangApiException>(() => request.SendAsync());
 
         Assert.Contains("404", failure.Message);
     }

@@ -11,6 +11,8 @@ using System.Security.Cryptography;
 using System.Text;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
+using FlintLauncher.ExternalApi.Ftb;
+using FlintLauncher.ExternalApi.Paste;
 using TruePath;
 using TruePath.SystemIo;
 using Xunit;
@@ -476,6 +478,69 @@ public class NetTests : IDisposable
         {
             Calls++;
             return Task.FromResult(respond(Calls));
+        }
+    }
+
+    [Fact]
+    public async Task FetchAsync_Stall_Surfaces_As_The_Category_Exception()
+    {
+        using var inner = new StallingHandler();
+        // per-test client lifetime is deliberate: the handler graph under test is fresh
+        // ReSharper disable once ShortLivedHttpClient
+        using var http = new HttpClient(new RetryHandler
+        {
+            RequestTimeout = TimeSpan.FromSeconds(1),
+            InnerHandler = inner,
+        });
+        var ftb = new FtbClient(new FtbClientOptions { BaseUrl = "http://stub" });
+
+        var failure = await Assert.ThrowsAsync<FtbApiException>(() => ftb.Packs.All().FetchAsync(http));
+
+        Assert.IsType<TimeoutException>(failure.InnerException);
+    }
+
+    [Fact]
+    public async Task SendOnceAsync_Caller_Cancellation_Propagates_Unwrapped()
+    {
+        using var inner = new StallingHandler();
+        // per-test client lifetime is deliberate: the handler graph under test is fresh
+        // ReSharper disable once ShortLivedHttpClient
+        using var http = new HttpClient(new RetryHandler { InnerHandler = inner });
+        using var cancel = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            new PasteClient().Pastes.Upload("log").SendOnceAsync(http, cancel.Token));
+    }
+
+    [Fact]
+    public async Task FetchAsync_Arms_The_Manual_Retry_Gate_SendOnceAsync_Does_Not()
+    {
+        using var flaky = new CountingHandler(call => call == 1
+            ? throw new HttpRequestException("connection reset")
+            : new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("""{"packs":[]}""") });
+        using var down = new CountingHandler(_ => throw new HttpRequestException("connection reset"));
+        // per-test client lifetime is deliberate: the handler graphs under test are fresh
+        // ReSharper disable once ShortLivedHttpClient
+        using var retrying = new HttpClient(new RetryHandler { MaxManualRetries = 1, InnerHandler = flaky });
+        // ReSharper disable once ShortLivedHttpClient
+        using var once = new HttpClient(new RetryHandler { MaxManualRetries = 1, InnerHandler = down });
+        var ftb = new FtbClient(new FtbClientOptions { BaseUrl = "http://stub" });
+
+        Assert.Empty(await ftb.Packs.All().FetchAsync(retrying));
+        Assert.Equal(2, flaky.Calls);
+
+        var failure = await Assert.ThrowsAsync<FtbApiException>(() => ftb.Packs.All().SendOnceAsync(once));
+        Assert.IsType<HttpRequestException>(failure.InnerException);
+        Assert.Equal(1, down.Calls);
+    }
+
+    private sealed class StallingHandler : HttpMessageHandler
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+            throw new InvalidOperationException("unreachable: the delay only ends by cancellation");
         }
     }
 

@@ -5,6 +5,7 @@
 // Port of launcher/minecraft/auth/steps/LauncherLoginStep.{h,cpp}.
 
 using System.Text.Json;
+using FlintLauncher.ExternalApi.Mojang;
 
 namespace FlintLauncher.Core.Auth;
 
@@ -14,52 +15,34 @@ public sealed class LauncherLoginStep(AccountData data, AuthEndpointsOptions? au
 
     public override string Describe() => "Fetching Minecraft access token";
 
-    private static readonly KeyValuePair<string, string>[] Headers =
-    [
-        new("Content-Type", "application/json"),
-        new("Accept", "application/json"),
-    ];
-
     public override async Task PerformAsync(CancellationToken cancellationToken)
     {
-        var url = _auth.MinecraftServices.TrimEnd('/') + "/launcher/login";
         var uhs = AccountData.GetString(ExtraValue("uhs"));
         var xToken = Data.MojangServicesToken.Value;
 
-        var mcAuthTemplate = "\n" + """
-                                    {
-                                        "xtoken": "XBL3.0 x=%1;%2",
-                                        "platform": "PC_LAUNCHER"
-                                    }
-                                    """ + "\n";
-        var requestBody = mcAuthTemplate.Replace("%1", uhs).Replace("%2", xToken);
-
-        var response = await AuthStepHttp.SendAsync(new AuthStepRequest
+        try
         {
-            Url = new Uri(url),
-            Body = requestBody,
-            Headers = Headers,
-            AutoRetry = true,
-        }, _auth.Http, cancellationToken).ConfigureAwait(false);
-
-        if (!response.Success)
+            (await AuthStepHttp.SendAsync(_auth.Mojang.MinecraftServices.LauncherLogin(uhs, xToken),
+                _auth.Http, autoRetry: true, cancellationToken).ConfigureAwait(false))
+                .ApplyTo(Data.YggdrasilToken);
+        }
+        catch (MojangApiException e) when (e.InnerException is JsonException)
         {
-            if (response.IsClientError)
+            EmitFinished(AccountTaskState.FailedSoft, "Failed to parse the Minecraft access token response.");
+            return;
+        }
+        catch (MojangApiException e)
+        {
+            if (e.IsClientError)
             {
-                EmitFinished(AccountTaskState.FailedSoft, $"Failed to get Minecraft access token: {response.ErrorString}");
+                EmitFinished(AccountTaskState.FailedSoft, $"Failed to get Minecraft access token: {e.Message}");
             }
             else
             {
-                Data.NetworkError = response.StatusCode;
-                EmitFinished(AccountTaskState.Offline, $"Failed to get Minecraft access token: {response.ErrorString}");
+                Data.NetworkError = e.StatusCode;
+                EmitFinished(AccountTaskState.Offline, $"Failed to get Minecraft access token: {e.Message}");
             }
 
-            return;
-        }
-
-        if (!Parsers.ParseMojangResponse(response.Body, Data.YggdrasilToken))
-        {
-            EmitFinished(AccountTaskState.FailedSoft, "Failed to parse the Minecraft access token response.");
             return;
         }
 

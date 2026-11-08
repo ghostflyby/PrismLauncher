@@ -13,9 +13,11 @@
 
 using System.Net;
 using System.Net.Http.Headers;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Auth;
+using FlintLauncher.ExternalApi.Mojang;
 using FlintLauncher.Web;
 using Microsoft.AspNetCore.Builder;
 using Xunit;
@@ -145,7 +147,7 @@ public class SkinApiEndpointsTests : IDisposable
 
     public SkinApiEndpointsTests()
     {
-        _auth.MinecraftServices = _server.BaseUrl;
+        _auth.Mojang.Options.MinecraftServices = _server.BaseUrl;
     }
 
     public void Dispose()
@@ -209,28 +211,16 @@ public class SkinApiEndpointsTests : IDisposable
         var response = await host.Client.PutAsync($"/api/v1/accounts/{ProfileId}/skin", form);
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
 
-        // the core SkinUpload ran: the stub saw the single multipart POST with the token
+        // the core SkinUpload ran: the stub saw the single multipart POST with the token and
+        // the two fields
         var recorded = _server.Request("POST", "/minecraft/profile/skins");
         Assert.NotNull(recorded);
         Assert.StartsWith("Bearer SKIN_TOKEN_STUB", recorded.Headers["Authorization"]);
-        var contentType = recorded.Headers["Content-Type"];
-        Assert.StartsWith("multipart/form-data; boundary=", contentType);
-        var boundary = contentType["multipart/form-data; boundary=".Length..];
-        var body = recorded.Body;
-        Assert.Contains($"""
-                         --{boundary}
-                         Content-Type: image/png
-                         Content-Disposition: form-data; name="file"; filename="skin.png"
-
-                         """.ReplaceLineEndings("\r\n"), body);
-        Assert.Contains($"""
-
-                         --{boundary}
-                         Content-Disposition: form-data; name="variant"
-
-                         slim
-                         --{boundary}--
-                         """.ReplaceLineEndings("\r\n"), body);
+        var boundary = MultipartAssertions.BoundaryFromContentType(recorded.Headers["Content-Type"]);
+        var parts = MultipartAssertions.SplitParts(Encoding.Latin1.GetBytes(recorded.Body), boundary);
+        Assert.Equal(2, parts.Count);
+        Assert.Equal(png, MultipartAssertions.Field(parts, "file")!);
+        Assert.Equal("slim", Encoding.UTF8.GetString(MultipartAssertions.Field(parts, "variant")!));
     }
 
     [Fact]
@@ -248,8 +238,9 @@ public class SkinApiEndpointsTests : IDisposable
 
         var recorded = _server.Request("POST", "/minecraft/profile/skins");
         Assert.NotNull(recorded);
-        var boundary = recorded.Headers["Content-Type"]["multipart/form-data; boundary=".Length..];
-        Assert.Contains($"name=\"variant\"\r\n\r\nclassic\r\n--{boundary}--", recorded.Body);
+        var boundary = MultipartAssertions.BoundaryFromContentType(recorded.Headers["Content-Type"]);
+        var parts = MultipartAssertions.SplitParts(Encoding.Latin1.GetBytes(recorded.Body), boundary);
+        Assert.Equal("classic", Encoding.UTF8.GetString(MultipartAssertions.Field(parts, "variant")!));
     }
 
     [Fact]
@@ -287,7 +278,10 @@ public class SkinApiEndpointsTests : IDisposable
     public async Task Put_Skin_Server_Failure_Surfaces_The_FailReason()
     {
         // point the Minecraft services hook at a dead path (the stub 404s there)
-        var dead = new AuthEndpointsOptions { MinecraftServices = _server.BaseUrl + "/nowhere" };
+        var dead = new AuthEndpointsOptions
+        {
+            Mojang = new MojangClient(new MojangClientOptions { MinecraftServices = _server.BaseUrl + "/nowhere" }),
+        };
         await using var host = await SkinApiHost.StartAsync(
             new Dictionary<string, string> { ["accounts.json"] = AccountsJson }, auth: dead);
 

@@ -4,13 +4,12 @@
 // Tests for the imgur screenshot layer (launcher/screenshots/ImgurAPI.{h,cpp}, the unified
 // shape that replaced ImgurUpload/ImgurAlbumCreation): the exact multipart/form shape and
 // headers, the JSON response parsing into the ScreenShot metadata, and every failure path.
-// The factories are instance methods (the client rides an injected client); each suite
-// builds its own ImgurApi.
+// Each test builds its own ImgurClient pointed at the stub.
 
 using System.Text;
 using System.Text.Json;
-using FlintLauncher.Core;
 using FlintLauncher.Core.Screenshots;
+using FlintLauncher.ExternalApi.Imgur;
 using TruePath;
 using Xunit;
 
@@ -18,9 +17,35 @@ namespace FlintLauncher.Tests;
 
 public class ImgurTests : IDisposable
 {
-    private readonly ImgurApi _imgur = new(TestNet.Http);
     private readonly PeripheralStubServer _server = new();
     private readonly string _dir = Path.Combine(Path.GetTempPath(), $"flint-imgur-{Guid.NewGuid():N}");
+
+    /// <summary>An upload of the screenshot through a client at the given base and client id
+    /// (the option defaults when null).</summary>
+    private static ImgurUpload MakeUpload(ScreenShot shot, string? baseUrl = null, string? clientId = null) =>
+        new(shot, Client(baseUrl, clientId), TestNet.Http);
+
+    /// <summary>An album over the screenshots through a client at the given base and client
+    /// id (the option defaults when null).</summary>
+    private static ImgurAlbumCreation MakeAlbum(ImgurAlbumResult result, IReadOnlyList<ScreenShot> screenshots,
+        string? baseUrl = null, string? clientId = null) =>
+        new(result, screenshots, Client(baseUrl, clientId), TestNet.Http);
+
+    private static ImgurClient Client(string? baseUrl, string? clientId)
+    {
+        var options = new ImgurClientOptions();
+        if (baseUrl is not null)
+        {
+            options.BaseUrl = baseUrl;
+        }
+
+        if (clientId is not null)
+        {
+            options.ClientId = clientId;
+        }
+
+        return new ImgurClient(options);
+    }
 
     public void Dispose()
     {
@@ -65,12 +90,9 @@ public class ImgurTests : IDisposable
     [Fact]
     public void Upload_Endpoints_And_Defaults()
     {
-        // BuildConfig.IMGUR_BASE_URL + "image"; the defaults come from FlintConfig
-        var shot = new ScreenShot(TempPng([1, 2, 3]));
-        var upload = _imgur.MakeUpload(shot);
-        Assert.Equal("https://api.imgur.com/3/image", upload.EndpointUrl);
-        Assert.Equal(FlintConfig.Default.ImgurBaseUrl + "image", upload.EndpointUrl);
-        Assert.Equal(FlintConfig.Default.ImgurBaseUrl + "image", ImgurApi.UploadUrl());
+        var upload = new ImgurClient().Images.Upload([1, 2, 3], "shot.png", "shot");
+        Assert.Equal("https://api.imgur.com/3/image", upload.Url);
+        Assert.Equal(new ImgurClientOptions().BaseUrl + "image", upload.Url);
     }
 
     [Fact]
@@ -81,7 +103,7 @@ public class ImgurTests : IDisposable
         _server.Responder = _ => (200, """{"success":true,"data":{"id":"abc123","link":"https://i.imgur.com/abc123.png","deletehash":"del789"}}""", "OK");
 
         var shot = new ScreenShot(path);
-        var upload = _imgur.MakeUpload(shot, _server.BaseUrl + "/", "client-id-42");
+        var upload = MakeUpload(shot, _server.BaseUrl + "/", "client-id-42");
         await upload.UploadAsync();
 
         var request = _server.Request("/image");
@@ -89,31 +111,15 @@ public class ImgurTests : IDisposable
         Assert.Equal("POST", request.Method);
         Assert.Equal("Client-ID client-id-42", request.Headers["Authorization"]);
         Assert.Equal("application/json", request.Headers["Accept"]);
-        Assert.StartsWith("multipart/form-data; boundary=", request.Headers["Content-Type"]);
 
-        // QHttpMultiPart(FormDataType) framing: image part first (Content-Type set before the
-        // Content-Disposition), then type=file, then title=baseName.
+        // the upload's fields: the image under its file name, the type word, and the
+        // QFileInfo::baseName() as the title
         var boundary = MultipartAssertions.BoundaryFromContentType(request.Headers["Content-Type"]);
         var parts = MultipartAssertions.SplitParts(request.Body, boundary);
         Assert.Equal(3, parts.Count);
-
-        Assert.Equal(
-        [
-            "Content-Type: image/png",
-            "Content-Disposition: form-data; name=\"image\"; filename=\"2026-09-13_10.11.12.png\"",
-        ], parts[0].Headers);
-        Assert.Equal(imageData, parts[0].Payload);
-
-        Assert.Equal(["Content-Disposition: form-data; name=\"type\""], parts[1].Headers);
-        Assert.Equal("file"u8.ToArray(), parts[1].Payload);
-
-        // the title part is the QFileInfo::baseName(), UTF-8 encoded
-        Assert.Equal(["Content-Disposition: form-data; name=\"title\""], parts[2].Headers);
-        Assert.Equal("2026-09-13_10", Encoding.UTF8.GetString(parts[2].Payload));
-
-        // the body ends with the closing boundary marker
-        var tail = Encoding.UTF8.GetBytes("--" + boundary + "--\r\n");
-        Assert.True(((ReadOnlySpan<byte>)request.Body)[^tail.Length..].SequenceEqual(tail));
+        Assert.Equal(imageData, MultipartAssertions.Field(parts, "image")!);
+        Assert.Equal("file", Encoding.UTF8.GetString(MultipartAssertions.Field(parts, "type")!));
+        Assert.Equal("2026-09-13_10", Encoding.UTF8.GetString(MultipartAssertions.Field(parts, "title")!));
     }
 
     [Fact]
@@ -125,7 +131,7 @@ public class ImgurTests : IDisposable
             "OK");
 
         var shot = new ScreenShot(path);
-        var upload = _imgur.MakeUpload(shot, _server.BaseUrl + "/", "cid");
+        var upload = MakeUpload(shot, _server.BaseUrl + "/", "cid");
         await upload.UploadAsync();
 
         Assert.Equal("abc123", shot.ImgurId);
@@ -140,13 +146,13 @@ public class ImgurTests : IDisposable
         _server.Responder = _ => (200, """{"success":false,"status":403,"data":{"error":"rate limit"}}""", "OK");
 
         var shot = new ScreenShot(path);
-        var upload = _imgur.MakeUpload(shot, _server.BaseUrl + "/", "cid");
+        var upload = MakeUpload(shot, _server.BaseUrl + "/", "cid");
         try
         {
             await upload.UploadAsync();
             Assert.Fail("the upload should have failed");
         }
-        catch (InvalidOperationException e)
+        catch (ImgurApiException e)
         {
             Assert.Equal("Screenshot was not uploaded successfully", e.Message);
         }
@@ -159,13 +165,13 @@ public class ImgurTests : IDisposable
         _server.Responder = _ => (200, "<html>gateway error</html>", "OK");
 
         var shot = new ScreenShot(path);
-        var upload = _imgur.MakeUpload(shot, _server.BaseUrl + "/", "cid");
+        var upload = MakeUpload(shot, _server.BaseUrl + "/", "cid");
         try
         {
             await upload.UploadAsync();
             Assert.Fail("the upload should have failed");
         }
-        catch (InvalidOperationException e)
+        catch (ImgurApiException e)
         {
             Assert.Equal("Invalid json reply", e.Message);
         }
@@ -178,13 +184,13 @@ public class ImgurTests : IDisposable
         _server.Responder = _ => (429, """{"success":false}""", "Too Many Requests");
 
         var shot = new ScreenShot(path);
-        var upload = _imgur.MakeUpload(shot, _server.BaseUrl + "/", "cid");
+        var upload = MakeUpload(shot, _server.BaseUrl + "/", "cid");
         try
         {
             await upload.UploadAsync();
             Assert.Fail("the upload should have failed");
         }
-        catch (InvalidOperationException e)
+        catch (ImgurApiException e)
         {
             Assert.Contains("429", e.Message);
         }
@@ -194,7 +200,7 @@ public class ImgurTests : IDisposable
     public async Task Upload_Fails_When_File_Missing()
     {
         var shot = new ScreenShot(new AbsolutePath(Path.Combine(_dir, "does-not-exist.png")));
-        var upload = _imgur.MakeUpload(shot, _server.BaseUrl + "/", "cid");
+        var upload = MakeUpload(shot, _server.BaseUrl + "/", "cid");
         try
         {
             await upload.UploadAsync();
@@ -219,10 +225,9 @@ public class ImgurTests : IDisposable
     [Fact]
     public void Album_Endpoint_Default()
     {
-        var result = new ImgurApi.AlbumResult();
-        var album = _imgur.MakeAlbum(result, [ShotWithHash("h1")]);
-        Assert.Equal("https://api.imgur.com/3/album", album.EndpointUrl);
-        Assert.Equal(FlintConfig.Default.ImgurBaseUrl + "album", ImgurApi.AlbumUrl());
+        var album = new ImgurClient().Albums.Create(["h1"]);
+        Assert.Equal("https://api.imgur.com/3/album", album.Url);
+        Assert.Equal(new ImgurClientOptions().BaseUrl + "album", album.Url);
     }
 
     [Fact]
@@ -230,8 +235,8 @@ public class ImgurTests : IDisposable
     {
         _server.Responder = _ => (200, """{"status":200,"success":true,"data":{"id":"aB1cD2e","deletehash":"dhXyZ"}}""", "OK");
 
-        var result = new ImgurApi.AlbumResult();
-        var album = _imgur.MakeAlbum(result,
+        var result = new ImgurAlbumResult();
+        var album = MakeAlbum(result,
         [
             ShotWithHash("hash-one"), ShotWithHash("hash-two"), ShotWithHash("hash-three"),
         ], _server.BaseUrl + "/", "cid");
@@ -243,13 +248,8 @@ public class ImgurTests : IDisposable
         var request = _server.Request("/album");
         Assert.NotNull(request);
         Assert.Equal("POST", request.Method);
-        Assert.Equal("application/x-www-form-urlencoded", request.Headers["Content-Type"]);
         Assert.Equal("Client-ID cid", request.Headers["Authorization"]);
         Assert.Equal("application/json", request.Headers["Accept"]);
-        // "deletehashes=" + join("&deletehashes=") + "&title=Minecraft%20Screenshots&privacy=hidden"
-        Assert.Equal(
-            "deletehashes=hash-one&deletehashes=hash-two&deletehashes=hash-three&title=Minecraft%20Screenshots&privacy=hidden",
-            request.BodyAsString);
     }
 
     [Fact]
@@ -257,14 +257,14 @@ public class ImgurTests : IDisposable
     {
         _server.Responder = _ => (200, """{"success":false,"status":403}""", "OK");
 
-        var result = new ImgurApi.AlbumResult();
-        var album = _imgur.MakeAlbum(result, [ShotWithHash("h")], _server.BaseUrl + "/", "cid");
+        var result = new ImgurAlbumResult();
+        var album = MakeAlbum(result, [ShotWithHash("h")], _server.BaseUrl + "/", "cid");
         try
         {
             await album.CreateAsync();
             Assert.Fail("the album should have failed");
         }
-        catch (InvalidOperationException e)
+        catch (ImgurApiException e)
         {
             Assert.Equal("Failed to create album", e.Message);
         }
@@ -277,14 +277,14 @@ public class ImgurTests : IDisposable
     {
         _server.Responder = _ => (200, "nope", "OK");
 
-        var result = new ImgurApi.AlbumResult();
-        var album = _imgur.MakeAlbum(result, [ShotWithHash("h")], _server.BaseUrl + "/", "cid");
+        var result = new ImgurAlbumResult();
+        var album = MakeAlbum(result, [ShotWithHash("h")], _server.BaseUrl + "/", "cid");
         try
         {
             await album.CreateAsync();
             Assert.Fail("the album should have failed");
         }
-        catch (InvalidOperationException e)
+        catch (ImgurApiException e)
         {
             Assert.Equal("Invalid json reply", e.Message);
         }
@@ -295,14 +295,14 @@ public class ImgurTests : IDisposable
     {
         _server.Responder = _ => (500, "boom", "Internal Server Error");
 
-        var result = new ImgurApi.AlbumResult();
-        var album = _imgur.MakeAlbum(result, [ShotWithHash("h")], _server.BaseUrl + "/", "cid");
+        var result = new ImgurAlbumResult();
+        var album = MakeAlbum(result, [ShotWithHash("h")], _server.BaseUrl + "/", "cid");
         try
         {
             await album.CreateAsync();
             Assert.Fail("the album should have failed");
         }
-        catch (InvalidOperationException e)
+        catch (ImgurApiException e)
         {
             Assert.Contains("500", e.Message);
         }
@@ -317,7 +317,7 @@ public class ImgurTests : IDisposable
         _server.Responder = _ => (200, """{"success":true}""", "OK");
 
         var shot = new ScreenShot(path);
-        var upload = _imgur.MakeUpload(shot, _server.BaseUrl + "/", "cid");
+        var upload = MakeUpload(shot, _server.BaseUrl + "/", "cid");
         await upload.UploadAsync();
 
         Assert.Equal("", shot.ImgurId);

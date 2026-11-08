@@ -4,7 +4,8 @@
 //
 // Port of launcher/minecraft/auth/steps/MinecraftProfileStep.{h,cpp}.
 
-using System.Net;
+using System.Text.Json;
+using FlintLauncher.ExternalApi.Mojang;
 
 namespace FlintLauncher.Core.Auth;
 
@@ -14,59 +15,47 @@ public sealed class MinecraftProfileStep(AccountData data, AuthEndpointsOptions?
 
     public override string Describe() => "Fetching the Minecraft profile.";
 
-    private static readonly KeyValuePair<string, string>[] Headers =
-    [
-        new("Content-Type", "application/json"),
-        new("Accept", "application/json"),
-    ];
-
     public override async Task PerformAsync(CancellationToken cancellationToken)
     {
-        var url = _auth.MinecraftServices.TrimEnd('/') + "/minecraft/profile";
-        var headers = new List<KeyValuePair<string, string>>(Headers)
+        MojangProfile? profile;
+        try
         {
-            new("Authorization", $"Bearer {Data.YggdrasilToken.Value}"),
-        };
-
-        var response = await AuthStepHttp.SendAsync(new AuthStepRequest
-        {
-            Url = new Uri(url),
-            Headers = headers,
-            AutoRetry = true,
-        }, _auth.Http, cancellationToken).ConfigureAwait(false);
-
-        if (response.StatusCode == HttpStatusCode.NotFound)
-        {
-            // NOTE: Succeed even if we do not have a profile. This is a valid account state.
-            Data.MinecraftProfile = new MinecraftProfile();
-            EmitFinished(AccountTaskState.Working, "Account has no Minecraft profile.");
-            return;
+            profile = await AuthStepHttp.SendAsync(
+                _auth.Mojang.MinecraftServices.Profile(Data.YggdrasilToken.Value),
+                _auth.Http, autoRetry: true, cancellationToken).ConfigureAwait(false);
         }
-
-        if (!response.Success)
-        {
-            if (response.IsClientError)
-            {
-                EmitFinished(AccountTaskState.FailedSoft,
-                    $"Minecraft Java profile acquisition failed: {response.ErrorString}");
-            }
-            else
-            {
-                Data.NetworkError = response.StatusCode;
-                EmitFinished(AccountTaskState.Offline,
-                    $"Minecraft Java profile acquisition failed: {response.ErrorString}");
-            }
-
-            return;
-        }
-
-        if (!Parsers.ParseMinecraftProfile(response.Body, Data.MinecraftProfile))
+        catch (MojangApiException e) when (e.InnerException is JsonException)
         {
             Data.MinecraftProfile = new MinecraftProfile();
             EmitFinished(AccountTaskState.FailedSoft, "Minecraft Java profile response could not be parsed");
             return;
         }
+        catch (MojangApiException e)
+        {
+            if (e.IsClientError)
+            {
+                EmitFinished(AccountTaskState.FailedSoft,
+                    $"Minecraft Java profile acquisition failed: {e.Message}");
+            }
+            else
+            {
+                Data.NetworkError = e.StatusCode;
+                EmitFinished(AccountTaskState.Offline,
+                    $"Minecraft Java profile acquisition failed: {e.Message}");
+            }
 
+            return;
+        }
+
+        // NOTE: Succeed even if we do not have a profile. This is a valid account state.
+        if (profile is null)
+        {
+            Data.MinecraftProfile = new MinecraftProfile();
+            EmitFinished(AccountTaskState.Working, "Account has no Minecraft profile.");
+            return;
+        }
+
+        profile.ApplyTo(Data.MinecraftProfile);
         EmitFinished(AccountTaskState.Working, "Got Minecraft profile");
     }
 }

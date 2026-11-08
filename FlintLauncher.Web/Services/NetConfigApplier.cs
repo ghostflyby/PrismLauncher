@@ -24,6 +24,7 @@ using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Secrets;
 using FlintLauncher.ExternalApi.Flame;
 using FlintLauncher.ExternalApi.Modrinth;
+using FlintLauncher.ExternalApi.Mojang;
 using Microsoft.Extensions.Options;
 
 namespace FlintLauncher.Web.Services;
@@ -76,8 +77,8 @@ public sealed class NetConfigApplier(
             !string.IsNullOrEmpty(flameKey) ? flameKey : FlintConfig.Default.FlameApiKey;
 
         var msaOverride = config.CurrentValue.Api.MsaClientIdOverride ?? "";
-        auth.MsaClientId = msaOverride.Length > 0
+        auth.Mojang.Options.MsaClientId = msaOverride.Length > 0
             ? msaOverride
-            : AuthEndpointsOptions.DefaultMsaClientId;
+            : MojangClientOptions.DefaultMsaClientId;
     }
 }

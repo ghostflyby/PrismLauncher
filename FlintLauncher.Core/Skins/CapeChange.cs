@@ -23,37 +23,21 @@
 // Port of launcher/minecraft/skins/CapeChange.{h,cpp}: PUT minecraft/profile/capes/active with
 // {"capeId":"<id>"}; an empty cape id becomes a DELETE (cape removal).
 
-using System.Text;
 using FlintLauncher.Core.Auth;
 using FlintLauncher.Core.Net;
+using FlintLauncher.ExternalApi.Mojang;
 
 namespace FlintLauncher.Core.Skins;
 
 public static class CapeChange
 {
     /// <summary>Port of CapeChange::change(token, capeId): PUT applies the cape, an empty id
-    /// is the bare DELETE that removes it; failures surface as <see cref="FlintHttpException"/>
-    /// (the C++ NetRequest status gate).</summary>
+    /// is the bare DELETE that removes it; failures (the C++ NetRequest status gate among
+    /// them) surface as <see cref="MojangApiException"/>.</summary>
     public static Task ChangeAsync(string token, string capeId, AuthEndpointsOptions? auth = null,
         CancellationToken cancellationToken = default)
     {
         var options = auth ?? new AuthEndpointsOptions();
-        var url = options.MinecraftServices.TrimEnd('/') + "/minecraft/profile/capes/active";
-        HttpRequestMessage message;
-        if (capeId.Length == 0)
-        {
-            message = new HttpRequestMessage(HttpMethod.Delete, url);
-        }
-        else
-        {
-            var body = "{\"capeId\":\"" + capeId + "\"}";
-            message = new HttpRequestMessage(HttpMethod.Put, url)
-            {
-                Content = new ByteArrayContent(Encoding.UTF8.GetBytes(body)),
-            };
-        }
-
-        message.Headers.TryAddWithoutValidation("Authorization", $"Bearer {token}");
-        return FlintHttp.SendAsync(options.Http, message, cancellationToken);
+        return options.Mojang.MinecraftServices.ChangeCape(token, capeId).FetchAsync(options.Http, cancellationToken);
     }
 }

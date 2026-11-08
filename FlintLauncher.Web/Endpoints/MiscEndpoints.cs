@@ -12,6 +12,7 @@ using FlintLauncher.Core.Java;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Settings;
 using FlintLauncher.Core.Tools;
+using FlintLauncher.ExternalApi.Paste;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.Services;
 using Microsoft.Extensions.Options;
@@ -128,17 +129,17 @@ public static class MiscEndpoints
             }
 
             // the typed user layer (the SettingsObject view retired)
-            var typeIndex = config.CurrentValue.Api.PastebinType ?? (int)PasteUpload.PasteType.Mclogs;
-            var pasteType = typeIndex >= 0 && typeIndex < PasteUpload.PasteTypes.Length
-                ? (PasteUpload.PasteType)typeIndex
-                : PasteUpload.PasteType.Mclogs;
+            var typeIndex = config.CurrentValue.Api.PastebinType ?? (int)PasteType.Mclogs;
+            var pasteType = typeIndex >= 0 && typeIndex < PasteClient.Types.Count
+                ? (PasteType)typeIndex
+                : PasteType.Mclogs;
             var upload = new PasteUpload(content, config.CurrentValue.Api.PastebinCustomApiBase ?? "",
                 pasteType, http);
             try
             {
                 return Results.Created("/api/v1/paste", new PasteCreatedResponse(await upload.UploadAsync()));
             }
-            catch (Exception e)
+            catch (PasteApiException e)
             {
                 return ApiJson.Error("paste_failed", e.Message, 502);
             }

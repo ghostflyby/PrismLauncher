@@ -9,6 +9,7 @@
 // the message (headers, content, per-request retry flags) is the caller's to build.
 
 using System.Text;
+using FlintLauncher.ExternalApi;
 
 namespace FlintLauncher.Core.Net;
 
@@ -22,6 +23,41 @@ public sealed class FlintHttpException(string reason) : Exception(reason)
 public static class FlintHttp
 {
     public const int MaxErrorBodyLength = 4096;
+
+    /// <summary>Sends a wire-layer operation with the transport policy of the fetch helpers
+    /// below: the RequestTimeout inactivity window over the send and the body read, and the
+    /// network-level manual retry gate. Every failure — a stalled exchange included — surfaces
+    /// as the operation's own failure exception.</summary>
+    public static Task<TResult> FetchAsync<TResult>(this IApiOperation<TResult> operation,
+        HttpClient http, CancellationToken cancellationToken = default) =>
+        SendWindowedAsync(operation, http, manualRetry: true, cancellationToken);
+
+    /// <summary>Sends a wire-layer operation exactly once — the policy of the uploads, which
+    /// must not be re-sent — under the RequestTimeout inactivity window. Every failure, a
+    /// stalled exchange included, surfaces as the operation's own failure exception.</summary>
+    public static Task<TResult> SendOnceAsync<TResult>(this IApiOperation<TResult> operation,
+        HttpClient http, CancellationToken cancellationToken = default) =>
+        SendWindowedAsync(operation, http, manualRetry: false, cancellationToken);
+
+    private static async Task<TResult> SendWindowedAsync<TResult>(IApiOperation<TResult> operation,
+        HttpClient http, bool manualRetry, CancellationToken cancellationToken)
+    {
+        using var window = new RetryHandler.Window(cancellationToken);
+        try
+        {
+            return await operation.SendTo(http, HttpCompletionOption.ResponseHeadersRead, window.Token, request =>
+            {
+                request.Options.Set(RetryHandler.ManualRetryOption, manualRetry);
+                request.Options.Set(RetryHandler.TimeoutSourceOption, window);
+            }).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (window.TimedOut)
+        {
+            // the self-scheduled timeout is this exchange's own failure, not the caller's
+            // cancellation
+            throw ApiOperation.WrapFailure(operation, new TimeoutException(window.TimeoutMessage));
+        }
+    }
 
     /// <summary>Send and read the body as UTF-8 text with the standard failure gate.</summary>
     public static async Task<string> GetStringAsync(HttpClient http,
@@ -37,8 +73,9 @@ public static class FlintHttp
     public static async Task<byte[]> SendAsync(HttpClient http,
         HttpRequestMessage message, CancellationToken cancellationToken = default)
     {
+        using var window = new RetryHandler.Window(cancellationToken);
         message.Options.Set(RetryHandler.ManualRetryOption, true);
-        using var window = new RetryHandler.Window(message, cancellationToken);
+        message.Options.Set(RetryHandler.TimeoutSourceOption, window);
 
         HttpResponseMessage response;
         try

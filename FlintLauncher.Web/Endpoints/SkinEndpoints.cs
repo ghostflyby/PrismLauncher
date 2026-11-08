@@ -20,8 +20,8 @@
 
 using System.Diagnostics.CodeAnalysis;
 using FlintLauncher.Core.Auth;
-using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Skins;
+using FlintLauncher.ExternalApi.Mojang;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.OpenApi;
 
@@ -81,7 +81,7 @@ public static class SkinEndpoints
             {
                 await upload.SendAsync();
             }
-            catch (Exception e)
+            catch (MojangApiException e)
             {
                 return ApiJson.Error("skin_upload_failed", e.Message, 400);
             }
@@ -102,9 +102,9 @@ public static class SkinEndpoints
             {
                 await SkinDelete.DeleteAsync(account.AccessToken(), auth);
             }
-            catch (FlintHttpException e)
+            catch (MojangApiException e)
             {
-                return ApiJson.Error("skin_delete_failed", e.Reason, 400);
+                return ApiJson.Error("skin_delete_failed", e.Message, 400);
             }
 
             return Results.NoContent();
@@ -133,9 +133,9 @@ public static class SkinEndpoints
             {
                 await CapeChange.ChangeAsync(account.AccessToken(), capeId, auth);
             }
-            catch (FlintHttpException e)
+            catch (MojangApiException e)
             {
-                return ApiJson.Error("cape_change_failed", e.Reason, 400);
+                return ApiJson.Error("cape_change_failed", e.Message, 400);
             }
 
             return Results.NoContent();
@@ -156,9 +156,9 @@ public static class SkinEndpoints
             {
                 await CapeChange.ChangeAsync(account.AccessToken(), "", auth);
             }
-            catch (FlintHttpException e)
+            catch (MojangApiException e)
             {
-                return ApiJson.Error("cape_change_failed", e.Reason, 400);
+                return ApiJson.Error("cape_change_failed", e.Message, 400);
             }
 
             return Results.NoContent();

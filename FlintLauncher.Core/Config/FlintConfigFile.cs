@@ -21,7 +21,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Serialization;
 using FlintLauncher.Core.Launch;
-using FlintLauncher.Core.Net;
+using FlintLauncher.ExternalApi.Paste;
 
 namespace FlintLauncher.Core.Config;
 
@@ -156,7 +156,7 @@ public sealed record FlintConfigFile
             MsaClientIdOverride = "",
             UserAgentOverride = "",
             PastebinCustomApiBase = "",
-            PastebinType = (int)PasteUpload.PasteType.Mclogs,
+            PastebinType = (int)PasteType.Mclogs,
         },
         Tools = new ToolsConfig
         {
@@ -450,7 +450,7 @@ public sealed record ApiConfig
     public string? UserAgentOverride { get; init; }
     public string? PastebinCustomApiBase { get; init; }
 
-    /// <summary>The PasteUpload.PasteType index (the C++ stores the enum's int).</summary>
+    /// <summary>The PasteType index (the C++ stores the enum's int).</summary>
     public int? PastebinType { get; init; }
 }
 

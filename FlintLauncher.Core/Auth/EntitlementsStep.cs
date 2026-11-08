@@ -7,6 +7,8 @@
 // Upstream ignores the parseMinecraftEntitlements() return value and always reports success
 // ("Got entitlements") — ported as-is.
 
+using FlintLauncher.ExternalApi.Mojang;
+
 namespace FlintLauncher.Core.Auth;
 
 public sealed class EntitlementsStep(AccountData data, AuthEndpointsOptions? auth = null) : AuthStep(data)
@@ -15,33 +17,24 @@ public sealed class EntitlementsStep(AccountData data, AuthEndpointsOptions? aut
 
     public override string Describe() => "Determining game ownership.";
 
-    private static readonly KeyValuePair<string, string>[] Headers =
-    [
-        new("Content-Type", "application/json"),
-        new("Accept", "application/json"),
-    ];
-
     public override async Task PerformAsync(CancellationToken cancellationToken)
     {
         // QUuid::createUuid().toString(QUuid::WithoutBraces)
         var entitlementsRequestId = Guid.NewGuid().ToString("D");
 
-        var url = _auth.MinecraftServices.TrimEnd('/') + "/entitlements/license?requestId=" + entitlementsRequestId;
-        var headers = new List<KeyValuePair<string, string>>(Headers)
-        {
-            new("Authorization", $"Bearer {Data.YggdrasilToken.Value}"),
-        };
-
-        var response = await AuthStepHttp.SendAsync(new AuthStepRequest
-        {
-            Url = new Uri(url),
-            Headers = headers,
-            AutoRetry = true,
-        }, _auth.Http, cancellationToken).ConfigureAwait(false);
-
         // TODO: check presence of same entitlementsRequestId?
         // TODO: validate JWTs?
-        _ = Parsers.ParseMinecraftEntitlements(response.Body, Data.MinecraftEntitlement);
+        // upstream never fails this step — a missing answer reads as no entitlements
+        try
+        {
+            var entitlements = await AuthStepHttp.SendAsync(
+                _auth.Mojang.MinecraftServices.Entitlements(Data.YggdrasilToken.Value, entitlementsRequestId),
+                _auth.Http, autoRetry: true, cancellationToken).ConfigureAwait(false);
+            entitlements?.ApplyTo(Data.MinecraftEntitlement);
+        }
+        catch (MojangApiException)
+        {
+        }
 
         EmitFinished(AccountTaskState.Working, "Got entitlements");
     }

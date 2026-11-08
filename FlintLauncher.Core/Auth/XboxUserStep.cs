@@ -4,6 +4,9 @@
 //
 // Port of launcher/minecraft/auth/steps/XboxUserStep.{h,cpp}.
 
+using System.Text.Json;
+using FlintLauncher.ExternalApi.Mojang;
+
 namespace FlintLauncher.Core.Auth;
 
 public sealed class XboxUserStep(AccountData data, AuthEndpointsOptions? auth = null) : AuthStep(data)
@@ -12,63 +15,35 @@ public sealed class XboxUserStep(AccountData data, AuthEndpointsOptions? auth = 
 
     public override string Describe() => "Logging in as an Xbox user.";
 
-    private static readonly KeyValuePair<string, string>[] Headers =
-    [
-        new("Content-Type", "application/json"),
-        new("Accept", "application/json"),
-        // set contract-version header (prevent err 400 bad-request?)
-        // https://learn.microsoft.com/en-us/gaming/gdk/_content/gc/reference/live/rest/additional/httpstandardheaders
-        new("x-xbl-contract-version", "1"),
-    ];
-
     public override async Task PerformAsync(CancellationToken cancellationToken)
     {
-        // NOTE: the raw-string template (with its leading/trailing newline and the "d=" RpsTicket
-        // prefix on the plain MSA token) is reproduced byte for byte.
-        var xboxAuthTemplate = "\n" + """
-                                      {
-                                          "Properties": {
-                                              "AuthMethod": "RPS",
-                                              "SiteName": "user.auth.xboxlive.com",
-                                              "RpsTicket": "d=%1"
-                                          },
-                                          "RelyingParty": "http://auth.xboxlive.com",
-                                          "TokenType": "JWT"
-                                      }
-                                      """ + "\n";
-        var xboxAuthData = xboxAuthTemplate.Replace("%1", Data.MsaToken.Value);
-
-        var response = await AuthStepHttp.SendAsync(new AuthStepRequest
+        try
         {
-            Url = new Uri(_auth.XboxUserAuth),
-            Body = xboxAuthData,
-            Headers = Headers,
-            AutoRetry = true,
-        }, _auth.Http, cancellationToken).ConfigureAwait(false);
-
-        if (!response.Success)
-        {
-            if (response.IsClientError)
-            {
-                EmitFinished(AccountTaskState.FailedSoft, $"Xbox user authentication failed: {response.ErrorString}");
-            }
-            else
-            {
-                Data.NetworkError = response.StatusCode;
-                EmitFinished(AccountTaskState.Offline, $"Xbox user authentication failed: {response.ErrorString}");
-            }
-
-            return;
+            Data.UserToken = (await AuthStepHttp.SendAsync(
+                    _auth.Mojang.Xbox.UserAuthenticate(Data.MsaToken.Value),
+                    _auth.Http, autoRetry: true, cancellationToken).ConfigureAwait(false))
+                .ToToken();
         }
-
-        var temp = new Token();
-        if (!Parsers.ParseXTokenResponse(response.Body, temp, "UToken"))
+        catch (MojangApiException e) when (e.InnerException is JsonException)
         {
             EmitFinished(AccountTaskState.FailedSoft, "Xbox user authentication response could not be understood.");
             return;
         }
+        catch (MojangApiException e)
+        {
+            if (e.IsClientError)
+            {
+                EmitFinished(AccountTaskState.FailedSoft, $"Xbox user authentication failed: {e.Message}");
+            }
+            else
+            {
+                Data.NetworkError = e.StatusCode;
+                EmitFinished(AccountTaskState.Offline, $"Xbox user authentication failed: {e.Message}");
+            }
 
-        Data.UserToken = temp;
+            return;
+        }
+
         EmitFinished(AccountTaskState.Working, "Got Xbox user token");
     }
 }

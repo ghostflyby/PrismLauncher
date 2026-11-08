@@ -61,6 +61,7 @@ using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.Core.Versioning;
+using FlintLauncher.ExternalApi.AtLauncher;
 using TruePath;
 using TruePath.SystemIo;
 
@@ -69,7 +70,8 @@ namespace FlintLauncher.Core.ModPlatform.AtLauncher;
 public sealed partial class AtLauncherPackInstallTask(
     string packName,
     string version,
-    AtLauncherApi api,
+    AtLauncherClient api,
+    HttpClient http,
     AtLauncherPackInstallTask.InstallMode installMode = AtLauncherPackInstallTask.InstallMode.Install)
     : InstanceTask
 {
@@ -86,9 +88,12 @@ public sealed partial class AtLauncherPackInstallTask(
     public string VersionName { get; } = version;
     public InstallMode InstallModeValue { get; } = installMode;
 
-    /// <summary>The injected ATLauncher client (URL builders + the net stack the pack's
-    /// requests ride; per-instance since the DownloadServerUrl de-singletoning).</summary>
-    private readonly AtLauncherApi _api = api;
+    /// <summary>The injected ATLauncher client (the operations and download-server URL
+    /// builders; per-instance since the DownloadServerUrl de-singletoning).</summary>
+    private readonly AtLauncherClient _api = api;
+
+    /// <summary>The net stack the pack's requests and downloads ride.</summary>
+    private readonly HttpClient _http = http;
 
     /// <summary>APPLICATION->metacache() hook ("ATLauncherPacks" base); null = plain downloads.</summary>
     public HttpMetaCache? MetaCache { get; set; }
@@ -147,33 +152,28 @@ public sealed partial class AtLauncherPackInstallTask(
     {
         EmitStatus("Fetching pack version...");
 
-        string configs;
+        PackVersion configs;
         try
         {
-            configs = await FlintHttp.GetStringAsync(_api.Http,
-                new HttpRequestMessage(HttpMethod.Get, _api.PackConfigsUrl(PackSafeName, VersionName)),
-                cancellationToken);
+            configs = await _api.Packs.Version(PackSafeName, VersionName).FetchAsync(_http, cancellationToken);
         }
-        catch (FlintHttpException e)
+        catch (AtLauncherApiException e) when (e.InnerException is JsonException)
         {
-            throw new InvalidOperationException(e.Reason);
+            // (the parse keeps the "JSON response from ATLauncher" wrapper of the former
+            // RequireDocument + LoadVersion reads; Normalize runs the load-time fixups)
+            throw new InvalidOperationException("Could not understand pack manifest:\n" + e.Message, e);
+        }
+        catch (AtLauncherApiException e)
+        {
+            throw new InvalidOperationException(e.Message, e);
         }
 
         await OnDownloadSucceeded(configs, cancellationToken);
     }
 
-    private async Task OnDownloadSucceeded(string response, CancellationToken cancellationToken)
+    private async Task OnDownloadSucceeded(PackVersion configs, CancellationToken cancellationToken)
     {
-        try
-        {
-            // (the parse keeps the "JSON response from ATLauncher" wrapper of the former
-            // RequireDocument + LoadVersion reads; Normalize runs the load-time fixups)
-            _configs = AtLauncherApi.LoadPackVersion(response);
-        }
-        catch (JsonException e)
-        {
-            throw new InvalidOperationException("Could not understand pack manifest:\n" + e.Message);
-        }
+        _configs = configs;
 
         // Derived from the installation mode
         string message;
@@ -183,12 +183,12 @@ public sealed partial class AtLauncherPackInstallTask(
         {
             case InstallMode.Reinstall:
             case InstallMode.Update:
-                message = Configs.Messages.Update;
+                message = Configs.Messages?.Update ?? "";
                 resetDirectory = true;
                 break;
 
             case InstallMode.Install:
-                message = Configs.Messages.Install;
+                message = Configs.Messages?.Install ?? "";
                 resetDirectory = false;
                 break;
 
@@ -241,10 +241,10 @@ public sealed partial class AtLauncherPackInstallTask(
         keeps.Files.Add(new VersionKeep { Base = "root", Target = "servers.dat" });
 
         // Merge with version deletes and keeps
-        deletes.Files.AddRange(Configs.Deletes.Files);
-        deletes.Folders.AddRange(Configs.Deletes.Folders);
-        keeps.Files.AddRange(Configs.Keeps.Files);
-        keeps.Folders.AddRange(Configs.Keeps.Folders);
+        deletes.Files.AddRange(Configs.Deletes?.Files ?? []);
+        deletes.Folders.AddRange(Configs.Deletes?.Folders ?? []);
+        keeps.Files.AddRange(Configs.Keeps?.Files ?? []);
+        keeps.Folders.AddRange(Configs.Keeps?.Folders ?? []);
 
         AbsolutePath GetPathForBase(string baseName)
         {
@@ -336,7 +336,7 @@ public sealed partial class AtLauncherPackInstallTask(
         }
     }
 
-    private string? GetDirForModType(ModType type, string raw)
+    private string? GetDirForModType(ModType type, string? raw)
     {
         switch (type)
         {
@@ -386,6 +386,11 @@ public sealed partial class AtLauncherPackInstallTask(
     private string? GetVersionForLoader(string uid)
     {
         var loader = Configs.Loader;
+        if (loader is null)
+        {
+            return null;
+        }
+
         if (loader.Recommended || loader.Latest || loader.Choose)
         {
             if (loader.Recommended || loader.Latest)
@@ -425,10 +430,10 @@ public sealed partial class AtLauncherPackInstallTask(
     private static string DetectLibrary(VersionLibrary library)
     {
         // Try to detect what the library is
-        if (library.Server.Length != 0 && library.Server.Split('/').Length >= 3)
+        if (library.Server is { Length: not 0 } server && server.Split('/').Length >= 3)
         {
-            var lastSlash = library.Server.LastIndexOf('/');
-            var locationAndVersion = library.Server[..lastSlash];
+            var lastSlash = server.LastIndexOf('/');
+            var locationAndVersion = server[..lastSlash];
 
             lastSlash = locationAndVersion.LastIndexOf('/');
             var location = locationAndVersion[..lastSlash];
@@ -544,7 +549,7 @@ public sealed partial class AtLauncherPackInstallTask(
             switch (lib.Download)
             {
                 case DownloadType.Server:
-                    library.AbsoluteUrl = _api.DownloadServerUrl + lib.Url;
+                    library.AbsoluteUrl = _api.Options.DownloadServerUrl + lib.Url;
                     break;
                 case DownloadType.Direct:
                     library.AbsoluteUrl = lib.Url;
@@ -569,16 +574,15 @@ public sealed partial class AtLauncherPackInstallTask(
 
     private bool CreatePackComponent(AbsolutePath instanceRoot, PackProfile profile)
     {
-        if (Configs.MainClass.MainClass.Length == 0 && Configs.ExtraArguments.Arguments.Length == 0)
+        var mainClass = Configs.MainClass?.MainClass ?? "";
+        var extraArguments = Configs.ExtraArguments?.Arguments ?? "";
+        if (mainClass.Length == 0 && extraArguments.Length == 0)
         {
             return true;
         }
 
-        var mainClass = Configs.MainClass.MainClass;
-        var extraArguments = Configs.ExtraArguments.Arguments;
-
-        var hasMainClassDepends = Configs.MainClass.Depends.Length != 0;
-        var hasExtraArgumentsDepends = Configs.ExtraArguments.Depends.Length != 0;
+        var hasMainClassDepends = (Configs.MainClass?.Depends?.Length ?? 0) != 0;
+        var hasExtraArgumentsDepends = (Configs.ExtraArguments?.Depends?.Length ?? 0) != 0;
         if (hasMainClassDepends || hasExtraArgumentsDepends)
         {
             var mods = new HashSet<string>();
@@ -587,12 +591,12 @@ public sealed partial class AtLauncherPackInstallTask(
                 mods.Add(item.Name);
             }
 
-            if (hasMainClassDepends && !mods.Contains(Configs.MainClass.Depends))
+            if (hasMainClassDepends && !mods.Contains(Configs.MainClass!.Depends!))
             {
                 mainClass = "";
             }
 
-            if (hasExtraArgumentsDepends && !mods.Contains(Configs.ExtraArguments.Depends))
+            if (hasExtraArgumentsDepends && !mods.Contains(Configs.ExtraArguments!.Depends!))
             {
                 extraArguments = "";
             }
@@ -693,18 +697,18 @@ public sealed partial class AtLauncherPackInstallTask(
         {
             var entry = MetaCache.ResolveEntry("ATLauncherPacks", path);
             entry.IsStale = true;
-            dl = HttpDownloadTask.Cached(MetaCache, new Uri(url), entry, http: _api.Http);
+            dl = HttpDownloadTask.Cached(MetaCache, new Uri(url), entry, http: _http);
             _archivePath = entry.GetFullPath();
         }
         else
         {
             _archivePath = TempCachePath(path);
-            dl = HttpDownloadTask.ToFile(new Uri(url), _archivePath, http: _api.Http);
+            dl = HttpDownloadTask.ToFile(new Uri(url), _archivePath, http: _http);
         }
 
-        if (Configs.Configs.Sha1.Length != 0)
+        if (Configs.Configs?.Sha1 is { Length: not 0 } sha1)
         {
-            dl.RequireChecksum(HashAlgorithmName.SHA1, Configs.Configs.Sha1);
+            dl.RequireChecksum(HashAlgorithmName.SHA1, sha1);
         }
 
         await dl.DownloadAsync(null, cancellationToken);
@@ -774,7 +778,7 @@ public sealed partial class AtLauncherPackInstallTask(
             switch (mod.Download)
             {
                 case DownloadType.Server:
-                    url = _api.DownloadServerUrl + mod.Url;
+                    url = _api.Options.DownloadServerUrl + mod.Url;
                     break;
                 case DownloadType.Browser:
                 {
@@ -796,7 +800,8 @@ public sealed partial class AtLauncherPackInstallTask(
                     throw new InvalidOperationException($"Unknown download type: {mod.DownloadRaw}");
             }
 
-            var cacheName = Path.GetFileNameWithoutExtension(mod.File) + "-" + mod.Md5 + Path.GetExtension(mod.File);
+            var cacheName = Path.GetFileNameWithoutExtension(mod.File) + "-" + (mod.Md5 ?? "") +
+                            Path.GetExtension(mod.File);
 
             if (mod.Type is ModType.Extract or ModType.TexturePackExtract or ModType.ResourcePackExtract)
             {
@@ -933,17 +938,17 @@ public sealed partial class AtLauncherPackInstallTask(
             var entry = MetaCache.ResolveEntry("ATLauncherPacks", cacheName);
             entry.IsStale = true;
             cachePath = entry.GetFullPath();
-            dl = HttpDownloadTask.Cached(MetaCache, new Uri(url), entry, http: _api.Http);
+            dl = HttpDownloadTask.Cached(MetaCache, new Uri(url), entry, http: _http);
         }
         else
         {
             cachePath = TempCachePath(cacheName);
-            dl = HttpDownloadTask.ToFile(new Uri(url), cachePath, http: _api.Http);
+            dl = HttpDownloadTask.ToFile(new Uri(url), cachePath, http: _http);
         }
 
-        if (mod.Md5.Length != 0)
+        if (mod.Md5 is { Length: not 0 } md5)
         {
-            dl.RequireChecksum(HashAlgorithmName.MD5, mod.Md5);
+            dl.RequireChecksum(HashAlgorithmName.MD5, md5);
         }
 
         downloads.Add(dl);
@@ -990,13 +995,12 @@ public sealed partial class AtLauncherPackInstallTask(
             var extractToPath = StagingPath / "minecraft" / extractToDir;
 
             var folderToExtract = "";
-            if (mod.Type == ModType.Extract)
+            if (mod.Type == ModType.Extract && mod.ExtractFolder is { } extractFolder)
             {
-                folderToExtract = mod.ExtractFolder;
-                folderToExtract = LeadingSlashRegex().Replace(folderToExtract, "");
+                folderToExtract = LeadingSlashRegex().Replace(extractFolder, "");
                 if (IsPathTraversal(extractToPath, folderToExtract))
                 {
-                    EmitStatus("Blocked path traversal in " + mod.ExtractFolder);
+                    EmitStatus("Blocked path traversal in " + extractFolder);
                     return false;
                 }
             }
@@ -1016,15 +1020,17 @@ public sealed partial class AtLauncherPackInstallTask(
                 return false;
             }
 
-            var extractToPath = StagingPath / "minecraft" / dir / mod.DecompFile;
+            // Normalize rejects a decompFile-less decomp mod before the install runs
+            var decompFile = mod.DecompFile!;
+            var extractToPath = StagingPath / "minecraft" / dir / decompFile;
 
-            if (IsPathTraversal(StagingPath / "minecraft" / dir, mod.DecompFile))
+            if (IsPathTraversal(StagingPath / "minecraft" / dir, decompFile))
             {
-                EmitStatus("Blocked path traversal in decompFile " + mod.DecompFile);
+                EmitStatus("Blocked path traversal in decompFile " + decompFile);
                 return false;
             }
 
-            if (!MmcZip.ExtractFile(modPath.Value, mod.DecompFile, extractToPath.Value))
+            if (!MmcZip.ExtractFile(modPath.Value, decompFile, extractToPath.Value))
             {
                 return false;
             }
@@ -1073,30 +1079,30 @@ public sealed partial class AtLauncherPackInstallTask(
             await components.SetComponentVersion("net.minecraft", Configs.Minecraft, important: true, cancellationToken);
 
             // Loader
-            if (Configs.Loader.Type == "forge")
+            if (Configs.Loader?.Type == "forge")
             {
                 var version = GetVersionForLoader("net.minecraftforge")
                               ?? throw new InvalidOperationException("No loader version set for modpack!");
 
                 await components.SetComponentVersion("net.minecraftforge", version, cancellationToken: cancellationToken);
             }
-            else if (Configs.Loader.Type == "neoforge")
+            else if (Configs.Loader?.Type == "neoforge")
             {
                 var version = GetVersionForLoader("net.neoforged")
                               ?? throw new InvalidOperationException("No loader version set for modpack!");
 
                 await components.SetComponentVersion("net.neoforged", version, cancellationToken: cancellationToken);
             }
-            else if (Configs.Loader.Type == "fabric")
+            else if (Configs.Loader?.Type == "fabric")
             {
                 var version = GetVersionForLoader("net.fabricmc.fabric-loader")
                               ?? throw new InvalidOperationException("No loader version set for modpack!");
 
                 await components.SetComponentVersion("net.fabricmc.fabric-loader", version, cancellationToken: cancellationToken);
             }
-            else if (Configs.Loader.Type.Length != 0)
+            else if (Configs.Loader is { Type.Length: not 0 } loader)
             {
-                throw new InvalidOperationException("Unknown loader type: " + Configs.Loader.Type);
+                throw new InvalidOperationException("Unknown loader type: " + loader.Type);
             }
 
             foreach (var (componentUid, componentVersion) in _componentsToInstall)

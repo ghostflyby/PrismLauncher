@@ -2,13 +2,13 @@
 // SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
 //
 // FTB endpoints, mirroring the ATLauncher surface: the /modpack/all index
-// pass-through, the per-pack description + version list (mapped through FtbPackManifest's
+// pass-through, the per-pack description + version list (decoded through FtbJson's
 // loaders like the C++ FtbListModel) and the pack install — FtbPackInstallTask run through
 // the same staged-commit flow as POST /modplatform/atlauncher/install (the modpacks.ch
 // metadata and the version files are small, so the flow is synchronous: 201 with the
 // committed instance, 500 creation_failed with the failure message otherwise).
 //
-// The FTB base URL is per-host state (FtbApi — the headless equivalent of the C++
+// The FTB base URL is per-host state (FtbClient — the headless equivalent of the C++
 // BuildConfig.FTB_API_BASE_URL constant). The install's `serverUrl` body field selects a
 // per-request derived client instead of mutating the shared one, so an override can never
 // leak into other requests (and needs no restore).
@@ -20,6 +20,7 @@ using FlintLauncher.Core.ModPlatform.Ftb;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.ExternalApi.Flame;
+using FlintLauncher.ExternalApi.Ftb;
 using FlintLauncher.ExternalApi.Modrinth;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.Services;
@@ -35,28 +36,17 @@ public static class FtbEndpoints
         // ---------------------------------------------------- modplatform/ftb/packs
         // the /modpack/all index pass-through (FtbListModel::requestFinished's parse): the
         // index payload only carries pack ids, so the response is {"packs":[{"id"},...]}
-        api.MapGet("/modplatform/ftb/packs", async (FtbApi ftb) =>
+        api.MapGet("/modplatform/ftb/packs", async (FtbClient ftb, HttpClient http) =>
         {
-            string body;
-            try
-            {
-                body = await ftb.FetchModpacksAsync();
-            }
-            catch (FlintHttpException e)
-            {
-                return ApiJson.Error("ftb_unavailable",
-                    $"ftb pack index failed: {e.Reason}", 502);
-            }
-
             List<int> ids;
             try
             {
-                ids = FtbApi.LoadModpackIndex(body);
+                ids = await ftb.Packs.All().FetchAsync(http);
             }
-            catch (JsonException e)
+            catch (FtbApiException e)
             {
-                return ApiJson.Error("ftb_invalid_response",
-                    $"ftb pack index is invalid: {e.Message}", 502);
+                return ApiJson.Error("ftb_unavailable",
+                    $"ftb pack index failed: {e.Message}", 502);
             }
 
             return Results.Ok(new FtbPackIndexResponse(
@@ -66,15 +56,15 @@ public static class FtbEndpoints
         // ---------------------------------------------- modplatform/ftb/packs/{id}
         // the /modpack/{id} description (FtbListModel::packRequestFinished's mapping)
         api.MapGet("/modplatform/ftb/packs/{id:int}", async Task<IResult> (int id,
-                    FtbApi ftb) =>
-                await WithPackAsync(ftb, id, pack => Results.Ok(PackView(pack))))
+                    FtbClient ftb, HttpClient http) =>
+                await WithPackAsync(ftb, http, id, pack => Results.Ok(PackView(pack))))
             .Produces<FtbPackView>();
 
         // -------------------------------------- modplatform/ftb/packs/{id}/versions
         // the description's version list (the FTB App API has no separate version index)
         api.MapGet("/modplatform/ftb/packs/{id:int}/versions", async Task<IResult> (int id,
-                    FtbApi ftb) =>
-                await WithPackAsync(ftb, id, pack => Results.Ok(pack.Versions
+                    FtbClient ftb, HttpClient http) =>
+                await WithPackAsync(ftb, http, id, pack => Results.Ok(pack.Versions
                     .Select(version => new FtbPackVersionView(version.Id, version.Name,
                         version.Type, version.Updated))
                     .ToArray())))
@@ -82,7 +72,7 @@ public static class FtbEndpoints
 
         // -------------------------------------------------- modplatform/ftb/install
         api.MapPost("/modplatform/ftb/install", async Task<IResult> (
-            FtbInstallRequest request, FtbApi ftbApi, ModrinthClient modrinth, HttpClient http, FlameClient flame, InstanceList instances, InstanceMutationLock instanceLock) =>
+            FtbInstallRequest request, FtbClient ftbApi, ModrinthClient modrinth, HttpClient http, FlameClient flame, InstanceList instances, InstanceMutationLock instanceLock) =>
         {
             if (request.PackId <= 0)
             {
@@ -90,8 +80,7 @@ public static class FtbEndpoints
             }
 
             // the request's client is resolved up front: a serverUrl override derives its own
-            // client (same net stack), the shared one is never mutated
-            // (nothing to restore)
+            // client, the shared one is never mutated (nothing to restore)
             var ftb = ResolveApi(ftbApi, request.ServerUrl, out var serverError);
             if (serverError is not null)
             {
@@ -103,26 +92,20 @@ public static class FtbEndpoints
             {
                 // the ctor needs the parsed pack description (its version list is what the
                 // task's own lookup matches the version name against)
-                string manifest;
-                try
-                {
-                    manifest = await ftb.FetchModpackAsync(request.PackId);
-                }
-                catch (FlintHttpException e)
-                {
-                    return ApiJson.Error("creation_failed",
-                        $"fetching the pack failed: {e.Reason}", 500);
-                }
-
                 FtbModpack pack;
                 try
                 {
-                    pack = FtbApi.LoadModpack(manifest);
+                    pack = await ftb.Packs.ById(request.PackId).FetchAsync(http);
                 }
-                catch (JsonException e)
+                catch (FtbApiException e) when (e.InnerException is JsonException)
                 {
                     return ApiJson.Error("creation_failed",
                         $"could not understand pack manifest:\n{e.Message}", 500);
+                }
+                catch (FtbApiException e)
+                {
+                    return ApiJson.Error("creation_failed",
+                        $"fetching the pack failed: {e.Message}", 500);
                 }
 
                 // resolve the version id to the name the task matches against; no
@@ -186,9 +169,9 @@ public static class FtbEndpoints
     // ----------------------------------------------------------------- helpers
 
     /// <summary>The request's FTB client: the shared one, or — with a `serverUrl`
-    /// override — a derived client (same net stack), leaving the shared instance untouched.
-    /// Returns the error result for a malformed override.</summary>
-    private static FtbApi ResolveApi(FtbApi ftb, string? serverUrl, out IResult? error)
+    /// override — a derived client, leaving the shared instance untouched. Returns the error
+    /// result for a malformed override.</summary>
+    private static FtbClient ResolveApi(FtbClient ftb, string? serverUrl, out IResult? error)
     {
         error = null;
         if (string.IsNullOrWhiteSpace(serverUrl))
@@ -205,43 +188,37 @@ public static class FtbEndpoints
             return ftb;
         }
 
-        // the FTB URL builders concatenate "/modpack/..." onto the base, so unlike the
+        // the FTB operations concatenate "/modpack/..." onto the base, so unlike the
         // ATLauncher one this derived base must NOT carry a trailing slash
-        return new FtbApi(ftb.Http) { BaseUrl = trimmed.TrimEnd('/') };
+        return new FtbClient(new FtbClientOptions { BaseUrl = trimmed.TrimEnd('/') });
     }
 
     /// <summary>Fetch + parse /modpack/{id} (the shared logic of the two GET endpoints) and
     /// hand the pack to <paramref name="map"/>; fetch/parse failures map to the uniform 502
     /// error envelope instead.</summary>
-    private static async Task<IResult> WithPackAsync(FtbApi ftb, int packId,
+    private static async Task<IResult> WithPackAsync(FtbClient ftb, HttpClient http, int packId,
         Func<FtbModpack, IResult> map)
     {
-        string body;
-        try
-        {
-            body = await ftb.FetchModpackAsync(packId);
-        }
-        catch (FlintHttpException e)
-        {
-            return ApiJson.Error("ftb_unavailable",
-                $"ftb pack fetch failed: {e.Reason}", 502);
-        }
-
         FtbModpack pack;
         try
         {
-            pack = FtbApi.LoadModpack(body);
+            pack = await ftb.Packs.ById(packId).FetchAsync(http);
         }
-        catch (JsonException e)
+        catch (FtbApiException e) when (e.InnerException is JsonException)
         {
             return ApiJson.Error("ftb_invalid_response",
                 $"ftb pack manifest is invalid: {e.Message}", 502);
+        }
+        catch (FtbApiException e)
+        {
+            return ApiJson.Error("ftb_unavailable",
+                $"ftb pack fetch failed: {e.Message}", 502);
         }
 
         return map(pack);
     }
 
-    /// <summary>The /modpack/{id} description as mapped through FtbPackManifest.LoadModpack
+    /// <summary>The /modpack/{id} description as mapped through FtbJson.LoadModpack
     /// (safeName is the normalized pack *image* name, "&lt;safe&gt;.png"; tags/authors are
     /// flattened to their names/urls).</summary>
     private static FtbPackView PackView(FtbModpack pack) => new(

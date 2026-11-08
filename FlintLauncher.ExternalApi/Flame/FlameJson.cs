@@ -64,11 +64,10 @@ public sealed record FlameDependency(
     int? ModId,
     int? RelationType);
 
-/// <summary>A CurseForge file (the /mods/.../files shapes). GameVersions stays the raw JSON
-/// element: the members mix MC versions with loader/side strings, and the loader reads them
-/// in place.</summary>
+/// <summary>A CurseForge file (the /mods/.../files shapes). GameVersions mixes MC versions
+/// with loader/side strings, and the loader reads them in place.</summary>
 public sealed record FlameModFile(
-    JsonElement? GameVersions,
+    List<string>? GameVersions,
     int? ModId,
     int? Id,
     string? FileDate,
