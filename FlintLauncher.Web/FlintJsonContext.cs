@@ -147,7 +147,7 @@ namespace FlintLauncher.Web;
 // migration layer (Prism→Flint import): request body + plan items
 [JsonSerializable(typeof(PrismImportRequest))]
 [JsonSerializable(typeof(PrismDeclineRequest))]
-[JsonSerializable(typeof(PrismSourceDetector.PrismSourceCandidate[]))]
+[JsonSerializable(typeof(PrismSourceCandidateView[]))]
 [JsonSerializable(typeof(PrismImportPlanResponse))]
 [JsonSerializable(typeof(PrismImportDryRunResponse))]
 [JsonSerializable(typeof(PrismImportPlanItem))]

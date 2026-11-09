@@ -44,6 +44,19 @@ public sealed record FlintMigrationCandidatesResponse(
     int PendingInstances,
     bool Any);
 
+/// <summary>GET /migration/prism/candidates response item — the wire projection of a
+/// detected source. The domain record carries typed paths; the wire stays strings so the
+/// typed path never enters the serialization graph at all.</summary>
+public sealed record PrismSourceCandidateView(
+    string Path,
+    string LegacyName,
+    string ConfigFile,
+    bool ConfigFound,
+    bool MarkerPresent,
+    bool TargetHasOwnConfig,
+    int Decision,
+    int InstancesFound);
+
 public static class MigrationEndpoints
 {
     public static void MapMigration(this RouteGroupBuilder api)
@@ -52,8 +65,8 @@ public static class MigrationEndpoints
         var group = api.MapGroup("/migration/prism");
 
         group.MapGet("/candidates", (PrismSourceCatalog catalog) =>
-                Results.Ok(catalog.Detect().ToArray()))
-            .Produces<PrismSourceDetector.PrismSourceCandidate[]>();
+                Results.Ok(catalog.Detect().Select(ToView).ToArray()))
+            .Produces<PrismSourceCandidateView[]>();
 
         group.MapGet("/plan", (PrismSourceCatalog catalog, FlintPaths paths, string source, string? mode) =>
         {
@@ -82,7 +95,16 @@ public static class MigrationEndpoints
             }
 
             // the one HTTP-boundary parse: the request DTO stays an unvalidated string,
-            // everything below is the typed domain
+            // everything below is the typed domain. The parse accepts only fully qualified
+            // paths — on Windows a rooted string without a drive letter is not absolute for
+            // TruePath 2 (its full-path spelling can still match a detected candidate), and
+            // a malformed source is a bad request, not a fault.
+            if (!Path.IsPathFullyQualified(source))
+            {
+                return ApiJson.Error("invalid_source",
+                    $"source directory '{source}' is not a fully qualified path", 400);
+            }
+
             AbsolutePath sourceDir = new(source);
             var plan = PrismImportPlanner.Plan(sourceDir, paths.DataDir, importMode);
             var totalFiles = plan.Sum(item => item.Files);
@@ -114,7 +136,15 @@ public static class MigrationEndpoints
             }
 
             // the one HTTP-boundary parse: the request DTO stays an unvalidated string,
-            // everything below is the typed domain
+            // everything below is the typed domain. The parse accepts only fully qualified
+            // paths — on Windows a rooted string without a drive letter is not absolute for
+            // TruePath 2, and a malformed source is a bad request, not a fault.
+            if (!Path.IsPathFullyQualified(request.Source))
+            {
+                return ApiJson.Error("invalid_source",
+                    $"source directory '{request.Source}' is not a fully qualified path", 400);
+            }
+
             AbsolutePath sourceDir = new(request.Source);
 
             if (request.DryRun)
@@ -249,6 +279,13 @@ public static class MigrationEndpoints
             return Results.Accepted($"/api/v1/tasks/{entry.Id}", new TaskAcceptedResponse(entry.Id));
         }).Produces<TaskAcceptedResponse>(202);
     }
+
+    /// <summary>The wire projection of one detected source: paths and the decision flatten
+    /// to their string/number forms (the shape the endpoint served before the typed-path
+    /// era, kept stable).</summary>
+    private static PrismSourceCandidateView ToView(PrismSourceDetector.PrismSourceCandidate c) =>
+        new(c.Path.Value, c.LegacyName, c.ConfigFile, c.ConfigFound, c.MarkerPresent,
+            c.TargetHasOwnConfig, (int)c.Decision, c.InstancesFound);
 
     private static bool TryParseMode(string? mode, out ImportMode parsed, out string error)
     {

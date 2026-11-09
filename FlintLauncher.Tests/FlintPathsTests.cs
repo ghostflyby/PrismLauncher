@@ -67,7 +67,9 @@ public class FlintPathsTests : IDisposable
     [Fact]
     public void Anchors_Follow_Their_Five_Root_Owners_And_Logs_The_State_Root()
     {
-        var paths = FlintPaths.FromHomeDir(new AbsolutePath("/tmp/flint-anchor-probe"));
+        // a throwaway (never-created) temp-rooted home: only its layout is asserted
+        var paths = FlintPaths.FromHomeDir(
+            Temporary.SystemTempDirectory() / $"flint-anchor-probe-{Guid.NewGuid():N}");
 
         // data-root anchors (the user-owned half, DATA §2)
         Assert.Equal(paths.DataRoot / "instances", paths.InstancesDir);
@@ -95,12 +97,14 @@ public class FlintPathsTests : IDisposable
     public void FromRoots_Keeps_The_Five_Roots_Independently()
     {
         // the roots are compared as the AbsolutePath instances they came from — a literal
-        // POSIX string would not survive windows normalization
-        var config = new AbsolutePath("/c");
-        var data = new AbsolutePath("/d");
-        var store = new AbsolutePath("/s");
-        var cache = new AbsolutePath("/k");
-        var state = new AbsolutePath("/st");
+        // POSIX string would not survive windows normalization, so each root is a distinct
+        // temp-rooted absolute path valid on every platform
+        AbsolutePath baseDir = Temporary.SystemTempDirectory() / $"flint-roots-{Guid.NewGuid():N}";
+        var config = baseDir / "c";
+        var data = baseDir / "d";
+        var store = baseDir / "s";
+        var cache = baseDir / "k";
+        var state = baseDir / "st";
         var paths = new FlintPaths()
         {
             ConfigRoot = config,
@@ -122,16 +126,18 @@ public class FlintPathsTests : IDisposable
     [Fact]
     public void LogsDir_Pins_To_The_Injected_State_Root_Even_On_MacOS()
     {
+        AbsolutePath baseDir = Temporary.SystemTempDirectory() / $"flint-logs-pin-{Guid.NewGuid():N}";
+        var stateRoot = baseDir / "my" / "state";
         var paths = new FlintPaths()
         {
-            ConfigRoot = new AbsolutePath("/c"),
-            DataRoot = new AbsolutePath("/d"),
-            StoreRoot = new AbsolutePath("/s"),
-            CacheRoot = new AbsolutePath("/k"),
-            StateRoot = new AbsolutePath("/my/state"),
+            ConfigRoot = baseDir / "c",
+            DataRoot = baseDir / "d",
+            StoreRoot = baseDir / "s",
+            CacheRoot = baseDir / "k",
+            StateRoot = stateRoot,
         };
 
-        Assert.Equal(new AbsolutePath("/my/state") / "logs", paths.LogsDir);
+        Assert.Equal(stateRoot / "logs", paths.LogsDir);
     }
 
     [Fact]

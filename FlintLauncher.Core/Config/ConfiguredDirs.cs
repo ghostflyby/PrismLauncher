@@ -10,7 +10,9 @@ namespace FlintLauncher.Core.Config;
 /// semantics (absolute wins as-is, relative joins the store root, empty falls back to the
 /// store/java anchor — the C++ "relative to the data dir" convention re-anchored by the store
 /// remount); IconsDir/SkinsDir follow the C++ "relative to the data dir" convention (absolute
-/// wins as-is, relative joins the data root, empty falls back to the C++ default name). Every
+/// wins as-is, relative joins the data root, empty falls back to the C++ default name).
+/// Absolute means fully qualified: on Windows a rooted value without a drive letter — which
+/// TruePath 2 cannot type — is ambiguous and joins the root like any relative value. Every
 /// member reads the live snapshot, so a settings write is visible on the next access.</summary>
 public sealed class ConfiguredDirs(FlintPaths paths, IOptionsMonitor<FlintConfigFile> config)
 {
@@ -19,7 +21,7 @@ public sealed class ConfiguredDirs(FlintPaths paths, IOptionsMonitor<FlintConfig
     public AbsolutePath JavaRoot =>
         string.IsNullOrWhiteSpace(config.CurrentValue.Dirs.JavaDir)
             ? paths.JavaRoot
-            : Path.IsPathRooted(config.CurrentValue.Dirs.JavaDir)
+            : Path.IsPathFullyQualified(config.CurrentValue.Dirs.JavaDir)
                 ? new AbsolutePath(config.CurrentValue.Dirs.JavaDir)
                 : paths.StoreRoot / config.CurrentValue.Dirs.JavaDir;
 
@@ -30,7 +32,7 @@ public sealed class ConfiguredDirs(FlintPaths paths, IOptionsMonitor<FlintConfig
     private AbsolutePath DataRelative(string? configured, string fallbackName) =>
         string.IsNullOrWhiteSpace(configured)
             ? paths.DataDir / fallbackName
-            : Path.IsPathRooted(configured)
+            : Path.IsPathFullyQualified(configured)
                 ? new AbsolutePath(configured)
                 : paths.DataDir / configured;
 }

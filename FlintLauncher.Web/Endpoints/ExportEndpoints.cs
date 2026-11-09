@@ -136,7 +136,7 @@ public static class ExportEndpoints
                 // the export actually succeeded (a failed export has no artifact)
                 var entry = registry.Start(kind,
                     handle => handle.RunAsync(token => export(token),
-                        () => handle.Result = new TaskResultView(null, null, output)),
+                        () => handle.Result = new TaskResultView(null, null, output.Value)),
                     instance.Id());
 
                 return Results.Accepted($"/api/v1/tasks/{entry.Id}", new TaskAcceptedResponse(entry.Id));
