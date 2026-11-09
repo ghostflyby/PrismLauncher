@@ -33,6 +33,18 @@ public class ProfilerTests
 
     // ---------------------------------------------------------------- registry
 
+    // the install locations and tools the argv/check tests point at: nonexistent absolute
+    // paths written in the per-platform fully-qualified form (TruePath 2 rejects a rooted
+    // string without a drive letter on Windows)
+    private static string JProfilerDir =>
+        OperatingSystem.IsWindows() ? @"C:\Program Files\JProfiler" : "/opt/jprofiler";
+
+    private static string VisualVmExe =>
+        OperatingSystem.IsWindows() ? @"C:\Program Files\VisualVM\visualvm.exe" : "/usr/bin/visualvm";
+
+    private static string MissingPath(string leaf) =>
+        OperatingSystem.IsWindows() ? $@"C:\definitely\not\{leaf}" : $"/definitely/not/{leaf}";
+
     private static T Factory<T>(string key) where T : ProfilerFactory
     {
         var factory = Profilers.Value(key)
@@ -73,7 +85,7 @@ public class ProfilerTests
         var settings = new TestSettings();
         var factory = Factory<JProfilerFactory>("jprofiler");
         factory.RegisterSettings(settings);
-        settings.Set("JProfilerPath", "/opt/jprofiler");
+        settings.Set("JProfilerPath", JProfilerDir);
         settings.Set("JProfilerPort", 51515);
 
         var (program, arguments) = factory.BuildCommand(settings, pid: 4321);
@@ -81,7 +93,7 @@ public class ProfilerTests
         // QDir(basePath).absoluteFilePath("bin/jpenable[.exe]") — the expectation composes
         // through the same path type as the production code, so the separators compare
         var exeName = OperatingSystem.IsWindows() ? "jpenable.exe" : "jpenable";
-        Assert.Equal((new AbsolutePath("/opt/jprofiler") / "bin" / exeName).Value, program.Value);
+        Assert.Equal((new AbsolutePath(JProfilerDir) / "bin" / exeName).Value, program.Value);
         // { "-d", pid, "--gui", "-p", port }
         Assert.Equal(["-d", "4321", "--gui", "-p", "51515"], arguments);
     }
@@ -93,7 +105,7 @@ public class ProfilerTests
         var factory = Factory<JProfilerFactory>("jprofiler");
         factory.RegisterSettings(settings);
 
-        settings.Set("JProfilerPath", "/opt/jprofiler");
+        settings.Set("JProfilerPath", JProfilerDir);
         var (program, arguments) = factory.BuildCommand(settings, pid: 7);
         var expectedName = OperatingSystem.IsWindows() ? "jpenable.exe" : "jpenable";
         Assert.EndsWith(expectedName, program.Value);
@@ -108,7 +120,7 @@ public class ProfilerTests
         Assert.False(factory.Check((AbsolutePath?)null, out var emptyError));
         Assert.Equal("Empty path", emptyError);
 
-        Assert.False(factory.Check(new AbsolutePath("/definitely/not/a/place"), out var missingError));
+        Assert.False(factory.Check(new AbsolutePath(MissingPath("place")), out var missingError));
         Assert.Equal("Path does not exist", missingError);
 
         var dir = Directory.CreateTempSubdirectory("flint-jprofiler").FullName;
@@ -146,11 +158,11 @@ public class ProfilerTests
         var settings = new TestSettings();
         var factory = Factory<JVisualVmFactory>("jvisualvm");
         factory.RegisterSettings(settings);
-        settings.Set("JVisualVMPath", "/usr/bin/visualvm");
+        settings.Set("JVisualVMPath", VisualVmExe);
 
         var (program, arguments) = factory.BuildCommand(settings, pid: 999);
 
-        Assert.Equal(new AbsolutePath("/usr/bin/visualvm").Value, program.Value);
+        Assert.Equal(new AbsolutePath(VisualVmExe).Value, program.Value);
         // { "--openpid", pid }
         Assert.Equal(["--openpid", "999"], arguments);
     }
@@ -163,7 +175,7 @@ public class ProfilerTests
         Assert.False(factory.Check((AbsolutePath?)null, out var emptyError));
         Assert.Equal("Empty path", emptyError);
 
-        Assert.False(factory.Check(new AbsolutePath("/definitely/not/visualvm"), out var missingError));
+        Assert.False(factory.Check(new AbsolutePath(MissingPath("visualvm")), out var missingError));
         Assert.Equal("Invalid path to VisualVM", missingError);
 
         var dir = Directory.CreateTempSubdirectory("flint-visualvm").FullName;

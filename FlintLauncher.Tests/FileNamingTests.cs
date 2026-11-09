@@ -66,8 +66,9 @@ public class FileNamingTests : IDisposable
     public async Task GetUniqueResourceName()
     {
         // enabled mods are prioritized and returned untouched (compared against the input
-        // path itself — a literal POSIX string would not survive windows normalization)
-        var enabled = new AbsolutePath("/x/mod.jar");
+        // path itself — a nonexistent sibling of the sandbox root stands in for the enabled
+        // mod, absolute and per-OS on every platform)
+        var enabled = new AbsolutePath(_tempRoot) / "x" / "mod.jar";
         Assert.Equal(enabled.Value, FileNaming.GetUniqueResourceName(enabled).Value);
 
         // disabled file whose stripped name does not exist: the original path is returned as-is

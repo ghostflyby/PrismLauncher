@@ -73,6 +73,13 @@ public abstract class ProfilerFactory
     /// with (no process is spawned here). <paramref name="pid"/> is the game process id.
     /// </summary>
     public abstract (AbsolutePath Program, IReadOnlyList<string> Arguments) BuildCommand(SettingsObject settings, int pid);
+
+    /// <summary>The configured path when it can be a typed absolute path at all: on Windows
+    /// a rooted string without a drive letter (or a drive-relative one) is not absolute for
+    /// TruePath 2 and the constructor would throw, so such a value reads as unset — the
+    /// check surface then reports it like an empty path instead of faulting.</summary>
+    protected static AbsolutePath? ConfiguredPath(string? raw) =>
+        string.IsNullOrEmpty(raw) || !Path.IsPathFullyQualified(raw) ? null : new AbsolutePath(raw);
 }
 
 /// <summary>Port of JProfilerFactory / JProfiler::beginProfilingImpl.</summary>
@@ -93,8 +100,7 @@ public sealed class JProfilerFactory : ProfilerFactory
 
     public override bool Check(SettingsObject settings, out string error)
     {
-        var raw = settings.Get(PathKey)?.ToString();
-        return Check(string.IsNullOrEmpty(raw) ? null : new AbsolutePath(raw), out error);
+        return Check(ConfiguredPath(settings.Get(PathKey)?.ToString()), out error);
     }
 
     public override bool Check(AbsolutePath? path, out string error)
@@ -129,12 +135,11 @@ public sealed class JProfilerFactory : ProfilerFactory
     public override (AbsolutePath Program, IReadOnlyList<string> Arguments) BuildCommand(SettingsObject settings, int pid)
     {
         var listeningPort = settings.Get(PortKey).AsIntSetting(DefaultPort);
-        var basePath = settings.Get(PathKey)?.ToString();
         // QDir(basePath).absoluteFilePath("bin/jpenable[.exe]")
         string a1 = OperatingSystem.IsWindows() ? "bin/jpenable.exe" : "bin/jpenable";
-        AbsolutePath profilerProgram = string.IsNullOrEmpty(basePath)
-            ? default
-            : new AbsolutePath(basePath) / a1;
+        AbsolutePath profilerProgram = ConfiguredPath(settings.Get(PathKey)?.ToString()) is { } basePath
+            ? basePath / a1
+            : default;
         var arguments = new[] { "-d", pid.ToString(), "--gui", "-p", listeningPort.ToString() };
         return (profilerProgram, arguments);
     }
@@ -157,8 +162,7 @@ public sealed class JVisualVmFactory : ProfilerFactory
 
     public override bool Check(SettingsObject settings, out string error)
     {
-        var raw = settings.Get(PathKey)?.ToString();
-        return Check(string.IsNullOrEmpty(raw) ? null : new AbsolutePath(raw), out error);
+        return Check(ConfiguredPath(settings.Get(PathKey)?.ToString()), out error);
     }
 
     public override bool Check(AbsolutePath? path, out string error)
@@ -179,12 +183,9 @@ public sealed class JVisualVmFactory : ProfilerFactory
         return true;
     }
 
-    public override (AbsolutePath Program, IReadOnlyList<string> Arguments) BuildCommand(SettingsObject settings, int pid)
-    {
-        var programPath = settings.Get(PathKey)?.ToString();
-        return (string.IsNullOrEmpty(programPath) ? default(AbsolutePath) : new AbsolutePath(programPath),
+    public override (AbsolutePath Program, IReadOnlyList<string> Arguments) BuildCommand(SettingsObject settings, int pid) =>
+        (ConfiguredPath(settings.Get(PathKey)?.ToString()) ?? default(AbsolutePath),
             new[] { "--openpid", pid.ToString() });
-    }
 
     /// <summary>The QStandardPaths::findExecutable default.</summary>
     public static AbsolutePath? FindExecutable(string executableName)
@@ -221,10 +222,12 @@ public sealed class JVisualVmFactory : ProfilerFactory
     /// <summary>A PATH entry as a scannable directory: an empty entry anchors on the
     /// process CWD (the POSIX convention the string-era scan inherited); "~"-style shell
     /// shortcuts are skipped (the string-era File.Exists never found a file under a
-    /// literal '~' directory either).</summary>
+    /// literal '~' directory either). Only fully qualified entries scan — on Windows a
+    /// rooted entry without a drive letter (<c>\Git\cmd</c>) is not an absolute path for
+    /// TruePath 2 and would throw, so it is skipped like any other unscannable form.</summary>
     private static AbsolutePath? ResolvePathEntry(string entry) =>
         entry.Length == 0 ? AbsolutePath.CurrentWorkingDirectory
-        : Path.IsPathRooted(entry) ? new AbsolutePath(entry)
+        : Path.IsPathFullyQualified(entry) ? new AbsolutePath(entry)
         : null;
 
     private static bool IsExecutable(AbsolutePath path)
