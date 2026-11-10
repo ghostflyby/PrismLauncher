@@ -28,9 +28,8 @@
 // ([JsonPropertyName]); required members use the
 // C# `required` modifier so a missing key fails deserialization, and the context turns
 // them into source-generated metadata with RespectNullableAnnotations (a JSON null for a
-// required member is an error). Optional members keep the QJsonValue coercion defaults
-// (toInt() of a missing value -> 0, toString() -> ""); Modpack.SafeName is a computed
-// property instead of a parsed field.
+// required member is an error). Optional members stay nullable; Modpack.SafeName is a
+// computed property instead of a parsed field.
 
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -40,8 +39,7 @@ using System.Text.RegularExpressions;
 
 namespace FlintLauncher.ExternalApi.Ftb;
 
-/// <summary>The /modpack/all wire root; the pack ids coerce like QJsonValue::toInt()
-/// (fractional doubles truncate, junk zeroes) through the packs list converter.</summary>
+/// <summary>The /modpack/all wire root: the pack ids as the answer lists them.</summary>
 public sealed class FtbPackIndexFile
 {
     public List<int> Packs { get; init; } = [];
@@ -260,8 +258,7 @@ public sealed partial class FtbJsonContext : JsonSerializerContext;
 public static class FtbJson
 {
     /// <summary>Parses the /modpack/all index: {"packs":[id,...]} -> the pack ids. A
-    /// missing/invalid payload yields an empty list (the dud-index tolerance of the
-    /// former model).</summary>
+    /// missing/invalid payload yields an empty list.</summary>
     public static List<int> LoadPackIndex(string response)
     {
         try

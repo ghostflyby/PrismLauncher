@@ -150,6 +150,11 @@ public static class TechnicJson
             {
                 throw new JsonException("Value is not an object");
             }
+
+            if (mod.Md5 is null)
+            {
+                throw new JsonException("'md5' is not a string");
+            }
         }
 
         return build;

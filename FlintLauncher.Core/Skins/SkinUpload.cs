@@ -25,8 +25,8 @@
 //
 // Deviations:
 //  - Upstream builds the request through QHttpMultiPart on QNetworkAccessManager; the
-//    request is the account service client's skin upload operation (an identical
-//    pre-built multipart body), sent with an injected client (defaulting to the auth
+//    request is the account service client's skin upload operation (a multipart/form-data
+//    body), sent with an injected client (defaulting to the auth
 //    context's client), like the C++ Net::Request subclass.
 //  - The endpoint base goes through the injected auth context's Minecraft services base
 //    (defaults byte-identical to the hardcoded upstream URL) so tests can stub it.

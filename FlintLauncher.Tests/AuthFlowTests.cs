@@ -252,6 +252,25 @@ public class AuthFlowTests : IDisposable
     }
 
     [Fact]
+    public async Task Device_Code_Restart_Failure_Settles_The_Flow()
+    {
+        // the first code expires at once, so the step restarts the device authorization;
+        // that restart fails and must settle the flow instead of re-requesting forever
+        _server.DeviceCodeExpiresIn = 1;
+        _server.DeviceCodeFailAfter = 1;
+
+        var account = MinecraftAccount.CreateBlankMsa();
+        var flow = new AuthFlow(account.AccountData, AuthFlowAction.DeviceCode, _auth);
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            flow.RunAsync(TestContext.Current.CancellationToken));
+
+        Assert.Equal(AccountTaskState.FailedHard, flow.TaskState);
+        Assert.StartsWith("Device authorization failed:", failure.Message);
+        // the expired first code was followed by exactly one (failed) restart request
+        Assert.Equal(2, _server.Requests.Count(r => r.Method == "POST" && r.Path == "/devicecode"));
+    }
+
+    [Fact]
     public async Task Abort_During_Device_Code_Poll_Routes_To_Aborted()
     {
         _server.PendingTokenResponses = 10; // keep the flow polling

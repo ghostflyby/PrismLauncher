@@ -5,8 +5,7 @@
 // The account services' answers with their binding — the response half of
 // launcher/minecraft/auth/Parsers.{h,cpp}. Three wire dialects, one context each: the Xbox
 // endpoints' exact PascalCase names, the Microsoft identity platform's snake_case and the
-// Minecraft services' camelCase. The converters carry the upstream member tolerance
-// (a missing or junk member reads as ""/0, a table entry with a junk member is skipped).
+// Minecraft services' camelCase.
 
 using System.Globalization;
 using System.Text.Json;
@@ -64,8 +63,8 @@ public sealed record MojangXstsDenialUnreadable : MojangXstsAnswer;
 public abstract record MojangTokenAnswer;
 
 /// <summary>A token grant; <paramref name="RefreshToken"/> is null for grants that issue
-/// none, <paramref name="Extra"/> holds every non-null member of the
-/// document.</summary>
+/// none, <paramref name="Extra"/> holds the members the typed ones do not
+/// carry.</summary>
 public sealed record MojangTokenGranted(
     string AccessToken,
     string? RefreshToken,
@@ -298,15 +297,11 @@ internal sealed partial class MojangMicrosoftJsonContext : JsonSerializerContext
 [JsonSerializable(typeof(MojangCapeChangeRequest))]
 public sealed partial class MojangServicesJsonContext : JsonSerializerContext;
 
-/// <summary>The XSTS refusal body: every member optional, XErr bound raw so a non-numeric
-/// member reads as absent (the "missing" refusal) rather than a failed read.</summary>
+/// <summary>The XSTS refusal body: XErr bound raw so a non-numeric member reads as absent
+/// (the "missing" refusal) rather than a failed read.</summary>
 internal sealed class MojangXstsErrorBody
 {
-    public string? Identity { get; set; }
-
     public JsonElement? XErr { get; set; }
-
-    public string? Message { get; set; }
 }
 
 /// <summary>Parsers::getDateTime (Qt::ISODate): a stated offset is kept as stated, a
@@ -366,8 +361,8 @@ public static class MojangJson
     }
 
     /// <summary>The device authorization start. An OAuth error document fails with its
-    /// description (or code); a body without the required members fails with
-    /// <see cref="JsonException"/>.</summary>
+    /// description (or code); a body without the required members — or with a non-positive
+    /// expiry — fails with <see cref="JsonException"/>.</summary>
     public static async Task<MojangDeviceAuthorization> LoadDeviceAuthorizationAsync(Stream body,
         CancellationToken ct)
     {
@@ -383,6 +378,11 @@ public static class MojangJson
             authorization.VerificationUri is null || authorization.ExpiresIn is null)
         {
             throw new JsonException("required fields missing");
+        }
+
+        if (authorization.ExpiresIn <= 0)
+        {
+            throw new JsonException("'expires_in' is not a positive integer");
         }
 
         return authorization;

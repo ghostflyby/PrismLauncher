@@ -2,8 +2,8 @@
 // SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
 //
 // Binding tests for the account services' answers: each wire dialect binds through its
-// context with the documented member tolerance (missing/junk members read as ""/0, table
-// entries with a junk member are skipped, required members fail the read).
+// context (required members fail the read, the tolerant endpoints read a malformed body
+// as their empty document).
 
 using System.Text;
 using System.Text.Json;
@@ -57,6 +57,14 @@ public class MojangJsonTests
         Assert.Equal("C", authorization.UserCode);
         Assert.Equal(900, authorization.ExpiresIn);
         Assert.Equal(5, authorization.Interval);
+    }
+
+    [Fact]
+    public async Task DeviceAuthorization_NonPositive_Expiry_Fails_The_Load()
+    {
+        await Assert.ThrowsAsync<JsonException>(() => MojangJson.LoadDeviceAuthorizationAsync(
+            Json("""{"device_code":"D","user_code":"C","verification_uri":"https://microsoft.com/devicelogin","expires_in":0}"""),
+            CancellationToken.None));
     }
 
     [Fact]

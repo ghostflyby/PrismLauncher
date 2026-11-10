@@ -156,6 +156,7 @@ public static class FlameMod
         var file = new IndexedVersion();
         foreach (var str in gameVersions)
         {
+            if (str is null) continue;
 
             if (str.Contains('.'))
             {

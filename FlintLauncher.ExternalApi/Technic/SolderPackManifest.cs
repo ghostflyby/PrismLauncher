@@ -5,7 +5,7 @@
 // Port of modplatform/technic/SolderPackManifest.{h,cpp}: the Solder API models —
 // /modpack/{slug} (recommended/latest/builds) and /modpack/{slug}/{build} (minecraft + mods).
 // The wire shape is annotated on the model properties; the Solder members are all required
-// except a mod's version (toString() of a missing/junk value -> "", the coercing converter).
+// except a mod's version, which is nullable.
 
 using System.Text.Json.Serialization;
 

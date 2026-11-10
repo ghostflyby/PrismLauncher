@@ -88,9 +88,9 @@ public sealed class MsaDeviceCodeStep(AccountData data, AuthEndpointsOptions? au
                 _auth.Mojang.Microsoft.DeviceAuthorization(_clientId),
                 _auth.Http, autoRetry: true, cancellationToken).ConfigureAwait(false);
 
-            // the loader rejects an answer without the codes and the expiry; a stated
-            // interval overrides the client's default
-            if (authorization.Interval is { } interval)
+            // the loader rejects an answer without the codes and a positive expiry; a stated
+            // positive interval overrides the client's default
+            if (authorization.Interval is int interval and > 0)
             {
                 _interval = interval;
             }
@@ -102,6 +102,9 @@ public sealed class MsaDeviceCodeStep(AccountData data, AuthEndpointsOptions? au
         }
         catch (MojangApiException e)
         {
+            // the FailedHard report settles the step; leaving the expiration set would keep
+            // the loop re-requesting a code that is already expired
+            _expirationUtc = null;
             var reason = e.InnerException switch
             {
                 InvalidOperationException refusal => refusal.Message,

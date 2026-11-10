@@ -21,8 +21,7 @@
 //     limitations under the License.
 //
 // The request halves of launcher/screenshots/ImgurAPI's makeUpload / makeAlbum: one image
-// as multipart/form-data (a pre-built body with the QHttpMultiPart part headers and CRLF
-// framing, since the multipart Content-Type must ride the content headers) and the album
+// as multipart/form-data and the album
 // as application/x-www-form-urlencoded delete hashes. Both replies keep the imgur status
 // rule (200/201/202/203/206 pass) and the "success" envelope check; their failures carry
 // the upstream texts as InvalidOperationException inside the wrapped failure.

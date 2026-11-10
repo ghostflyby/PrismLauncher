@@ -24,9 +24,8 @@
 // Port of modplatform/atlauncher/ATLPackManifest.{h,cpp}: the per-pack/version Configs.json
 // model (loader, libraries, mods incl. optional flags, configs checksum, keeps/deletes,
 // mainClass/extraArguments) with the exact fields the C++ loadVersion() reads. The wire
-// shape is annotated on the model properties ([JsonPropertyName] + the QJsonValue-semantics
-// annotations on the model properties); deserialization goes through the AtLauncherJsonContext
-// (AtLauncherJson.cs).
+// shape is annotated on the model properties ([JsonPropertyName]); deserialization goes
+// through the AtLauncherJsonContext (AtLauncherJson.cs).
 //
 // Semantics notes:
 //  - the former Has()-guarded members keep their two-sided behavior without nullable
@@ -353,7 +352,7 @@ public static class AtLauncherPackManifest
                 mod.TypeRaw = "forge";
             }
 
-            if (mod.DecompTypeRaw is not null && mod.DecompFile is null)
+            if (mod.DecompFile is null && (mod.DecompTypeRaw is not null || mod.Type == ModType.Decomp))
             {
                 throw new JsonException("'decompFile' is not a string");
             }

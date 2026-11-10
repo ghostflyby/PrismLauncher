@@ -87,7 +87,7 @@ public sealed class SolderPackInstallTask(Uri solderUrl, string pack, string ver
             var i = 0;
             foreach (var mod in build.Mods)
             {
-                // LoadSolderPackBuild rejects null elements and null urls before this runs
+                // LoadSolderPackBuild rejects null elements and null members before this runs
                 var modUrl = mod?.Url
                              ?? throw new InvalidOperationException("the Solder build carries an unvalidated mod");
                 var path = outputDir / i.ToString();
