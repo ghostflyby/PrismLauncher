@@ -20,6 +20,7 @@ using FlintLauncher.Core.Net;
 using FlintLauncher.Core.State;
 using FlintLauncher.Nbt;
 using FlintLauncher.Web;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.DependencyInjection;
 using TruePath;
 using Xunit;
@@ -503,10 +504,7 @@ public class CoverageFixLaunchJoinApiTests
         {
             using var reader = new StreamReader(ctx.Request.InputStream, Encoding.UTF8);
             var raw = await reader.ReadToEndAsync();
-            if (raw.StartsWith("content=", StringComparison.Ordinal))
-            {
-                lastPasteContent = Uri.UnescapeDataString(raw["content=".Length..]);
-            }
+            lastPasteContent = QueryHelpers.ParseQuery(raw).GetValueOrDefault("content").ToString();
 
             var bytes = Encoding.UTF8.GetBytes("""{"success":true,"url":"https://mclo.gs/FLINT1"}""");
             ctx.Response.ContentType = "application/json";

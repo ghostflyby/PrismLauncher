@@ -14,15 +14,16 @@ public interface IApiOperation<TResult>
     /// body; the content must be replayable (buffered or empty).</summary>
     protected internal HttpRequestMessage CreateRequest();
 
-    /// <summary>Wraps a transport, gate or read failure into the operation's failure
-    /// exception; the pipeline throws the result. Cancellation never reaches this.</summary>
+    /// <summary>Wraps a transport or read failure into the operation's failure exception; the
+    /// pipeline throws the result. Cancellation never reaches this.</summary>
     protected internal Exception WrapFailure(Exception failure);
 
-    /// <summary>Reads the response into the result type: gate through
-    /// <see cref="ApiOperation.EnsureSuccessAsync"/> (or the endpoint's own rule), then take
-    /// the body from the response message and decode it (JSON through the serializer's
-    /// stream API, text through a reader, files straight to disk). The response stays owned
-    /// by the pipeline and must not be disposed here.</summary>
+    /// <summary>Reads the response — any status — into the result type. The endpoint alone
+    /// decides what each status means and how the body is taken (JSON through the
+    /// serializer's stream API, text through a reader, files straight to disk); shared
+    /// patterns such as <see cref="ApiResponses.EnsureSuccessAsync"/> apply only where the
+    /// endpoint calls them. The response stays owned by the pipeline and must not be disposed
+    /// here.</summary>
     protected internal Task<TResult> ReadResponseAsync(HttpResponseMessage response,
         CancellationToken ct);
 }
@@ -51,44 +52,30 @@ public interface IApiOperation<in TArgs, TResult>
 }
 
 /// <summary>The shared execution pipeline for all typed API operations: send through the
-/// handed executor and give the response to the operation's own reader; a failed send, gate
-/// or read surfaces as the operation's wrapped failure, while cancellation propagates
+/// handed executor and give the response to the operation's own reader; a failed send or
+/// read surfaces as the operation's wrapped failure, while cancellation propagates
 /// untouched. Owns the disposal of the request and the response.</summary>
 public static class ApiOperation
 {
-    /// <summary>The body excerpt cap of the status-gate message.</summary>
-    public const int MaxErrorBodyLength = 4096;
+    /// <summary>Wraps a failure the caller detected around a send of the operation — an
+    /// exchange its own transport policy cut short — into the operation's failure exception,
+    /// the same wrapper its transport and read failures take.</summary>
+    public static Exception WrapFailure<TResult>(IApiOperation<TResult> operation, Exception failure) =>
+        operation.WrapFailure(failure);
 
-    /// <summary>The status gate most endpoints share: non-2xx raises HttpRequestException
-    /// carrying the status, the request URL and up to <see cref="MaxErrorBodyLength"/>
-    /// characters of the response body.</summary>
-    public static async Task EnsureSuccessAsync(HttpResponseMessage response, CancellationToken ct)
-    {
-        if (response.IsSuccessStatusCode)
-        {
-            return;
-        }
-
-        await using var body = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
-        using var reader = new StreamReader(body);
-        var buffer = new char[MaxErrorBodyLength + 1];
-        var read = await reader.ReadBlockAsync(buffer, ct).ConfigureAwait(false);
-        var excerpt = new string(buffer, 0, Math.Min(read, MaxErrorBodyLength));
-        throw new HttpRequestException(
-            $"HTTP status {(int)response.StatusCode} for {response.RequestMessage?.RequestUri}\n{excerpt}",
-            inner: null,
-            statusCode: response.StatusCode);
-    }
-
-    /// <summary>Sends the operation through the given executor. Transport, gate and read
-    /// failures surface as the operation's wrapped failure; cancellation propagates
+    /// <summary>Sends the operation through the given executor. Transport and read failures
+    /// surface as the operation's wrapped failure; cancellation propagates
     /// untouched.</summary>
+    /// <param name="prepare">Runs on the freshly built request before the send — the
+    /// caller's transport-policy seam: the request options an invoker's handler chain reads
+    /// its behavior from.</param>
     public static async Task<TResult> SendTo<TResult>(this IApiOperation<TResult> operation,
-        HttpMessageInvoker invoker, CancellationToken ct = default)
+        HttpMessageInvoker invoker, CancellationToken ct = default, Action<HttpRequestMessage>? prepare = null)
     {
         try
         {
             using var request = operation.CreateRequest();
+            prepare?.Invoke(request);
             using var response = await invoker.SendAsync(request, ct).ConfigureAwait(false);
             return await operation.ReadResponseAsync(response, ct).ConfigureAwait(false);
         }
@@ -104,13 +91,15 @@ public static class ApiOperation
 
     /// <summary>Sends the operation through an HttpClient with the read option of this send
     /// — ResponseHeadersRead streams the body to the reader, ResponseContentRead buffers it
-    /// first. Failure shaping matches the invoker overload.</summary>
+    /// first. Failure shaping and the prepare seam match the invoker overload.</summary>
     public static async Task<TResult> SendTo<TResult>(this IApiOperation<TResult> operation,
-        HttpClient http, HttpCompletionOption readOption, CancellationToken ct = default)
+        HttpClient http, HttpCompletionOption readOption, CancellationToken ct = default,
+        Action<HttpRequestMessage>? prepare = null)
     {
         try
         {
             using var request = operation.CreateRequest();
+            prepare?.Invoke(request);
             using var response = await http.SendAsync(request, readOption, ct).ConfigureAwait(false);
             return await operation.ReadResponseAsync(response, ct).ConfigureAwait(false);
         }
@@ -125,14 +114,16 @@ public static class ApiOperation
     }
 
     /// <summary>Sends the operation with per-send arguments through the given executor; the
-    /// arguments are exclusively owned by this send. Failure shaping matches the no-argument
-    /// overload.</summary>
+    /// arguments are exclusively owned by this send. Failure shaping and the prepare seam
+    /// match the no-argument overload.</summary>
     public static async Task<TResult> SendTo<TArgs, TResult>(this IApiOperation<TArgs, TResult> operation,
-        HttpMessageInvoker invoker, TArgs args, CancellationToken ct = default)
+        HttpMessageInvoker invoker, TArgs args, CancellationToken ct = default,
+        Action<HttpRequestMessage>? prepare = null)
     {
         try
         {
             using var request = operation.CreateRequest(args);
+            prepare?.Invoke(request);
             using var response = await invoker.SendAsync(request, ct).ConfigureAwait(false);
             return await operation.ReadResponseAsync(args, response, ct).ConfigureAwait(false);
         }
@@ -148,13 +139,15 @@ public static class ApiOperation
 
     /// <summary>Sends the operation with per-send arguments through an HttpClient with the
     /// read option of this send — the streaming form of the parameterized download. Failure
-    /// shaping matches the no-argument overload.</summary>
+    /// shaping and the prepare seam match the no-argument overload.</summary>
     public static async Task<TResult> SendTo<TArgs, TResult>(this IApiOperation<TArgs, TResult> operation,
-        HttpClient http, HttpCompletionOption readOption, TArgs args, CancellationToken ct = default)
+        HttpClient http, HttpCompletionOption readOption, TArgs args, CancellationToken ct = default,
+        Action<HttpRequestMessage>? prepare = null)
     {
         try
         {
             using var request = operation.CreateRequest(args);
+            prepare?.Invoke(request);
             using var response = await http.SendAsync(request, readOption, ct).ConfigureAwait(false);
             return await operation.ReadResponseAsync(args, response, ct).ConfigureAwait(false);
         }

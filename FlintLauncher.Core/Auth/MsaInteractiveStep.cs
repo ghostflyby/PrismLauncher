@@ -46,6 +46,8 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
+using FlintLauncher.ExternalApi.Mojang;
+
 namespace FlintLauncher.Core.Auth;
 
 public sealed class MsaInteractiveStep(AccountData data, bool silent = false, AuthEndpointsOptions? auth = null) : AuthStep(data)
@@ -67,7 +69,7 @@ public sealed class MsaInteractiveStep(AccountData data, bool silent = false, Au
 
     public override async Task PerformAsync(CancellationToken cancellationToken)
     {
-        _clientId = _auth.MsaClientId;
+        _clientId = _auth.Mojang.Options.MsaClientId;
         if (silent)
         {
             if (Data.MsaClientId != _clientId)
@@ -109,37 +111,33 @@ public sealed class MsaInteractiveStep(AccountData data, bool silent = false, Au
 
     private async Task RefreshAccessTokenAsync(CancellationToken cancellationToken)
     {
-        var payload = FormEncode(
-            ("grant_type", "refresh_token"),
-            ("client_id", _clientId),
-            ("refresh_token", Data.MsaToken.RefreshToken));
-        var response = await AuthStepHttp.SendAsync(new AuthStepRequest
+        MojangTokenAnswer answer;
+        try
         {
-            Url = new Uri(_auth.MsaToken),
-            Body = payload,
-            Headers = FormHeaders,
-        }, _auth.Http, cancellationToken).ConfigureAwait(false);
-
-        var rsp = ParseTokenResponse(response.Body);
-        if (rsp.Error.Length != 0)
-        {
-            // QOAuth2AuthorizationCodeFlow::error(QString, QString, uri) path
-            EmitFinished(AccountTaskState.FailedHard, rsp.ErrorDescription.Length != 0 ? rsp.ErrorDescription : rsp.Error);
-            return;
+            answer = await AuthStepHttp.SendAsync(
+                _auth.Mojang.Microsoft.RefreshToken(_clientId, Data.MsaToken.RefreshToken),
+                _auth.Http, autoRetry: false, cancellationToken).ConfigureAwait(false);
         }
-
-        if (!response.Success)
+        catch (MojangApiException e)
         {
             // QOAuth2AuthorizationCodeFlow::requestFailed(Error) path: silent + granted means
-            // network errors are offline states, everything else is a soft failure.
-            var state = response.Exception is HttpRequestException or IOException
+            // no-answer network errors are offline states, everything else is a soft failure.
+            var state = e.InnerException is HttpRequestException or IOException && e.StatusCode is null
                 ? AccountTaskState.Offline
                 : AccountTaskState.FailedSoft;
             EmitFinished(state, "Failed to refresh token.");
             return;
         }
 
-        ApplyGrantedTokens(rsp);
+        if (answer is MojangTokenRefused refusal)
+        {
+            // QOAuth2AuthorizationCodeFlow::error(QString, QString, uri) path
+            EmitFinished(AccountTaskState.FailedHard,
+                refusal.ErrorDescription.Length != 0 ? refusal.ErrorDescription : refusal.Error);
+            return;
+        }
+
+        ApplyGrantedTokens((MojangTokenGranted)answer);
         EmitFinished(AccountTaskState.Working, "Got MSA token");
     }
 
@@ -151,12 +149,7 @@ public sealed class MsaInteractiveStep(AccountData data, bool silent = false, Au
         var redirectUri = _listener.Start();
 
         // QOAuth2AuthorizationCodeFlow::buildAuthenticateUrl() + modifyParametersFunction(prompt)
-        var authorizeUrl = _auth.MsaAuthorize +
-                           "?response_type=code" +
-                           "&client_id=" + Uri.EscapeDataString(_clientId) +
-                           "&scope=" + Uri.EscapeDataString("XboxLive.SignIn XboxLive.offline_access") +
-                           "&redirect_uri=" + Uri.EscapeDataString(redirectUri) +
-                           "&prompt=select_account";
+        var authorizeUrl = _auth.Mojang.Microsoft.AuthorizeUrl(_clientId, redirectUri);
 
         AuthorizeWithBrowser?.Invoke(authorizeUrl);
 
@@ -199,32 +192,27 @@ public sealed class MsaInteractiveStep(AccountData data, bool silent = false, Au
             return;
         }
 
-        var payload = FormEncode(
-            ("grant_type", "authorization_code"),
-            ("client_id", _clientId),
-            ("code", code),
-            ("redirect_uri", redirectUri));
-        var response = await AuthStepHttp.SendAsync(new AuthStepRequest
+        MojangTokenAnswer answer;
+        try
         {
-            Url = new Uri(_auth.MsaToken),
-            Body = payload,
-            Headers = FormHeaders,
-        }, _auth.Http, cancellationToken).ConfigureAwait(false);
-
-        var rsp = ParseTokenResponse(response.Body);
-        if (rsp.Error.Length != 0)
-        {
-            EmitFinished(AccountTaskState.FailedHard, rsp.ErrorDescription.Length != 0 ? rsp.ErrorDescription : rsp.Error);
-            return;
+            answer = await AuthStepHttp.SendAsync(
+                _auth.Mojang.Microsoft.AuthorizationCode(_clientId, code, redirectUri),
+                _auth.Http, autoRetry: false, cancellationToken).ConfigureAwait(false);
         }
-
-        if (!response.Success)
+        catch (MojangApiException)
         {
             EmitFinished(AccountTaskState.FailedHard, "Microsoft user authentication failed.");
             return;
         }
 
-        ApplyGrantedTokens(rsp);
+        if (answer is MojangTokenRefused refusal)
+        {
+            EmitFinished(AccountTaskState.FailedHard,
+                refusal.ErrorDescription.Length != 0 ? refusal.ErrorDescription : refusal.Error);
+            return;
+        }
+
+        ApplyGrantedTokens((MojangTokenGranted)answer);
         EmitFinished(AccountTaskState.Working, "Got MSA token");
     }
 
@@ -247,80 +235,15 @@ public sealed class MsaInteractiveStep(AccountData data, bool silent = false, Au
 
     // ----------------------------------------------------------------- shared pieces
 
-    private void ApplyGrantedTokens(TokenResponse rsp)
+    private void ApplyGrantedTokens(MojangTokenGranted rsp)
     {
         Data.MsaClientId = _clientId;
         var now = DateTimeOffset.UtcNow;
         Data.MsaToken.IssueInstant = now;
         Data.MsaToken.NotAfter = now.AddSeconds(rsp.ExpiresIn);
-        Data.MsaToken.Extra = rsp.Extra;
-        Data.MsaToken.RefreshToken = rsp.RefreshToken;
+        Data.MsaToken.Extra = new Dictionary<string, JsonElement>(rsp.Extra);
+        Data.MsaToken.RefreshToken = rsp.RefreshToken ?? "";
         Data.MsaToken.Value = rsp.AccessToken;
-    }
-
-    private static readonly KeyValuePair<string, string>[] FormHeaders =
-    [
-        new("Content-Type", "application/x-www-form-urlencoded"),
-        new("Accept", "application/json"),
-    ];
-
-    private static string FormEncode(params (string key, string value)[] pairs)
-    {
-        var sb = new StringBuilder();
-        foreach (var (key, value) in pairs)
-        {
-            if (sb.Length > 0)
-            {
-                sb.Append('&');
-            }
-
-            sb.Append(Uri.EscapeDataString(key)).Append('=').Append(Uri.EscapeDataString(value));
-        }
-
-        return sb.ToString();
-    }
-
-    private sealed record TokenResponse(
-        string AccessToken,
-        string RefreshToken,
-        int ExpiresIn,
-        string Error,
-        string ErrorDescription,
-        Dictionary<string, JsonElement> Extra);
-
-    private static TokenResponse ParseTokenResponse(byte[] data)
-    {
-        JsonObject? obj;
-        try
-        {
-            obj = JsonNode.Parse(data) as JsonObject;
-        }
-        catch (Exception e) when (e is JsonException or ArgumentException)
-        {
-            obj = null;
-        }
-
-        if (obj is null)
-        {
-            return new TokenResponse("", "", 0, "", "", new Dictionary<string, JsonElement>());
-        }
-
-        var extra = new Dictionary<string, JsonElement>();
-        foreach (var (key, value) in obj)
-        {
-            if (value is not null)
-            {
-                extra[key] = AccountData.ToElement(value);
-            }
-        }
-
-        return new TokenResponse(
-            AccountData.GetString(AccountData.Get(obj, "access_token")),
-            AccountData.GetString(AccountData.Get(obj, "refresh_token")),
-            AccountData.EnsureInteger(obj, "expires_in"),
-            AccountData.GetString(AccountData.Get(obj, "error")),
-            AccountData.GetString(AccountData.Get(obj, "error_description")),
-            extra);
     }
 
     private static Dictionary<string, string> ParseQuery(string query)

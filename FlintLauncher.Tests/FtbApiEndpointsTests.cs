@@ -8,14 +8,14 @@
 // CurseForge-only file) and the failure surface (unknown pack -> 500 creation_failed with
 // the fetch reason, unknown version -> the failure cause, validation -> 400).
 //
-// Each suite builds its own FtbApi/FlameClient clients pointed at the stubs and hands them to
+// Each suite builds its own FtbClient/FlameClient clients pointed at the stubs and hands them to
 // the host (per-instance BaseUrl, nothing process-global to restore).
 
 using System.Net;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using FlintLauncher.Core.ModPlatform.Ftb;
 using FlintLauncher.ExternalApi.Flame;
+using FlintLauncher.ExternalApi.Ftb;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -23,14 +23,14 @@ namespace FlintLauncher.Tests;
 public class FtbApiEndpointsTests : IDisposable
 {
     private readonly FlameClient _flameApi = new();
-    private readonly FtbApi _ftbApi;
+    private readonly FtbClient _ftbApi;
     private readonly StubFtbServer _server = new();
     private readonly StubFlameServer _flameServer = new();
     private readonly byte[] _cfBytes = "ftb curseforge-resolved mod payload"u8.ToArray();
 
     public FtbApiEndpointsTests()
     {
-        _ftbApi = new FtbApi(TestNet.Http) { BaseUrl = _server.Url };
+        _ftbApi = new FtbClient(new FtbClientOptions { BaseUrl = _server.Url });
         // the FTB install resolves CurseForge-only files through the Flame layer
         _flameApi.Options.BaseUrl = _flameServer.Url;
     }
@@ -271,7 +271,7 @@ public class FtbApiEndpointsTests : IDisposable
         SetupFlameResolution();
         // a dead runtime client forces the request's serverUrl override to be the only
         // working route
-        var deadClient = new FtbApi(TestNet.Http) { BaseUrl = "http://127.0.0.1:9" };
+        var deadClient = new FtbClient(new FtbClientOptions { BaseUrl = "http://127.0.0.1:9" });
         await using var host = await FlintApiHost.StartAsync(flame: _flameApi, ftb: deadClient);
 
         var post = await host.PostAsync("/api/v1/modplatform/ftb/install", new
@@ -283,7 +283,7 @@ public class FtbApiEndpointsTests : IDisposable
         Assert.Equal(HttpStatusCode.Created, post.StatusCode);
 
         // the override built a derived client; the shared one keeps its (bogus) base URL
-        Assert.Equal("http://127.0.0.1:9", deadClient.BaseUrl);
+        Assert.Equal("http://127.0.0.1:9", deadClient.Options.BaseUrl);
         Assert.True(File.Exists(Path.Combine(host.DataDir, "instances", "Test FTB Pack",
             ".minecraft", "mods", "testmod.jar")));
     }

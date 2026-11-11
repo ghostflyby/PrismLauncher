@@ -21,97 +21,35 @@
 //     limitations under the License.
 //
 // Port of launcher/screenshots/ImgurAPI.{h,cpp} (the unified imgur request layer that
-// replaced ImgurUpload.{h,cpp} + ImgurAlbumCreation.{h,cpp}): POST one screenshot to imgur
-// as multipart/form-data, and group uploaded screenshots into an album through the
-// application/x-www-form-urlencoded delete hashes. Upstream exposes ImgurAPI::makeUpload /
-// ImgurAPI::makeAlbum returning (request, result) pairs; the request half of each pair is a
-// Net::Request the caller starts, so here the factories return an object whose async method
-// performs the identical HTTP exchange.
-//
-// Deviations:
-//  - Upstream builds the requests through QHttpMultiPart on QNetworkAccessManager; the port
-//    pre-builds an identical multipart body (same part headers and CRLF framing, like
-//    Skins/SkinUpload.cs) and sends it through the injected client, because
-//    the plain fetch helper cannot express multipart Content-Type headers.
-//  - The imgur base URL / client id come from FlintConfig (BuildConfig.IMGUR_BASE_URL /
-//    IMGUR_CLIENT_ID) by default but are factory-injectable so tests can stub them.
+// replaced ImgurUpload.{h,cpp} + ImgurAlbumCreation.{h,cpp}): upload one screenshot to
+// imgur, and group uploaded screenshots into an album through their delete hashes.
+// Upstream exposes ImgurAPI::makeUpload / ImgurAPI::makeAlbum returning (request, result)
+// pairs; here each pair is an object whose async method performs the exchange and fills
+// the result. The requests and the reply rules are the imgur client's operations
+// (FlintLauncher.ExternalApi.Imgur); these units own the screenshot side — reading the file
+// and carrying the reply into the ScreenShot metadata.
 
 using System.Security;
-using System.Text;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using FlintLauncher.Core.Net;
+using FlintLauncher.ExternalApi.Imgur;
 using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.Screenshots;
 
-/// <summary>The imgur response envelope {"success": true, "data": {...}} — shared by the
-/// image upload and album creation parse functions (the RPC::Sink payloads).</summary>
-public sealed record ImgurResponseJson(
-    bool? Success,
-    ImgurDataJson? Data);
-
-public sealed record ImgurDataJson(
-    string? Id,
-    string? Link,
-    // all-lowercase on the wire — camelCase would produce "deleteHash"
-    [property: JsonPropertyName("deletehash")]
-    string? DeleteHash);
-
-[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
-[JsonSerializable(typeof(ImgurResponseJson))]
-internal sealed partial class ImgurJsonContext : JsonSerializerContext;
-
-/// <summary>Port of the ImgurAPI namespace: the two imgur request factories. An instance
-/// rides the injected client (the composition root's ImgurApi — same de-singletoning story
-/// as the platform clients); the requests it builds send through that stack's client.</summary>
-public sealed class ImgurApi(HttpClient http)
+/// <summary>Port of ImgurAPI::AlbumResult.</summary>
+public sealed record ImgurAlbumResult
 {
-    /// <summary>The network stack this client's uploads flow through.</summary>
-    public HttpClient Http { get; } = http;
-
-    /// <summary>Port of ImgurAPI::AlbumResult.</summary>
-    public sealed record AlbumResult
-    {
-        public string DeleteHash { get; set; } = "";
-        public string Id { get; set; } = "";
-    }
-
-    /// <summary>The imgur image endpoint: BuildConfig.IMGUR_BASE_URL + "image".</summary>
-    public static string UploadUrl(string? baseUrl = null) => (baseUrl ?? FlintConfig.Default.ImgurBaseUrl) + "image";
-
-    /// <summary>The imgur album endpoint: BuildConfig.IMGUR_BASE_URL + "album".</summary>
-    public static string AlbumUrl(string? baseUrl = null) => (baseUrl ?? FlintConfig.Default.ImgurBaseUrl) + "album";
-
-    /// <summary>Port of ImgurAPI::makeUpload: upload one screenshot as an image.</summary>
-    public ImgurUpload MakeUpload(ScreenShot shot, string? baseUrl = null, string? clientId = null) =>
-        new(shot, Http, baseUrl, clientId);
-
-    /// <summary>Port of ImgurAPI::makeAlbum: group uploaded screenshots into an album
-    /// (the payload needs the delete hashes left by the earlier uploads).</summary>
-    public ImgurAlbumCreation MakeAlbum(AlbumResult result, IReadOnlyList<ScreenShot> screenshots,
-        string? baseUrl = null, string? clientId = null) =>
-        new(result, screenshots, Http, baseUrl, clientId);
+    public string DeleteHash { get; set; } = "";
+    public string Id { get; set; } = "";
 }
 
 /// <summary>The upload half of ImgurAPI::makeUpload (the Net::Request + RPC::Sink&lt;QString&gt;
-/// pair): fills the ScreenShot metadata from the response JSON.</summary>
-public sealed class ImgurUpload(
-    ScreenShot shot,
-    HttpClient http,
-    string? baseUrl = null,
-    string? clientId = null)
+/// pair): fills the ScreenShot metadata from the reply.</summary>
+public sealed class ImgurUpload(ScreenShot shot, ImgurClient imgur, HttpClient http)
 {
-    private readonly string _clientId = clientId ?? FlintConfig.Default.ImgurClientId;
-
-    /// <summary>The imgur endpoint: BuildConfig.IMGUR_BASE_URL + "image".</summary>
-    public string EndpointUrl
-    {
-        get => field + "image";
-    } = baseUrl ?? FlintConfig.Default.ImgurBaseUrl;
-
     /// <summary>Uploads the screenshot; on success it carries the imgur id, url and delete
-    /// hash.</summary>
+    /// hash. An unreadable screenshot fails as <see cref="InvalidOperationException"/>, the
+    /// upload itself as <see cref="ImgurApiException"/>.</summary>
     public async Task UploadAsync(CancellationToken cancellationToken = default)
     {
         byte[] fileData;
@@ -125,167 +63,35 @@ public sealed class ImgurUpload(
             throw new InvalidOperationException($"Could not open file {shot.FilePath} for reading: {e.Message}");
         }
 
-        var boundary = "flint-" + Guid.NewGuid().ToString("N");
-        var body = BuildMultipartBody(boundary, fileData, shot.FileName(), shot.BaseName());
-
-        using var message = new HttpRequestMessage(HttpMethod.Post, EndpointUrl);
-        message.Headers.TryAddWithoutValidation("Authorization", $"Client-ID {_clientId}");
-        message.Headers.TryAddWithoutValidation("Accept", "application/json");
-        message.Content = new ByteArrayContent(body);
-        message.Content.Headers.TryAddWithoutValidation("Content-Type", "multipart/form-data; boundary=" + boundary);
-
-        // the inactivity window (RequestTimeout): the transport's retry gate arms it with
-        // its configured length and covers the send with it
-        using var window = new RetryHandler.Window(message, cancellationToken);
-        using var response = await http.SendAsync(message, HttpCompletionOption.ResponseHeadersRead,
-            window.Token).ConfigureAwait(false);
-        var statusCode = (int)response.StatusCode;
-        string responseBody;
-        try
-        {
-            responseBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-        }
-        catch (IOException)
-        {
-            responseBody = "";
-        }
-
-        if (statusCode is not 200 and not 201 and not 202 and not 203 and not 206)
-        {
-            throw new InvalidOperationException($"HTTP status {statusCode} for {EndpointUrl}\n{Truncate(responseBody)}");
-        }
-
-        // Port of the RPC::Sink<QString> parse function.
-        ImgurResponseJson? reply;
-        try
-        {
-            reply = JsonSerializer.Deserialize(responseBody, ImgurJsonContext.Default.ImgurResponseJson);
-        }
-        catch (JsonException)
-        {
-            // "imgur server did not reply with JSON"
-            throw new InvalidOperationException("Invalid json reply");
-        }
-
-        if (reply?.Success != true)
-        {
-            throw new InvalidOperationException("Screenshot was not uploaded successfully");
-        }
-
-        if (reply.Data is { } data)
+        var data = await imgur.Images.Upload(fileData, shot.FileName(), shot.BaseName())
+            .SendOnceAsync(http, cancellationToken).ConfigureAwait(false);
+        if (data is not null)
         {
             shot.ImgurId = data.Id ?? "";
             shot.Url = data.Link ?? "";
             shot.ImgurDeleteHash = data.DeleteHash ?? "";
         }
     }
-
-    /// <summary>
-    /// The exact QHttpMultiPart(QHttpMultiPart::FormDataType) framing: the image part carries
-    /// "Content-Type: image/png" then the Content-Disposition with the file name, followed by
-    /// the "type" = "file" part and the "title" = baseName part.
-    /// </summary>
-    public static byte[] BuildMultipartBody(string boundary, byte[] imageData, string fileName, string baseName)
-    {
-        using var stream = new MemoryStream();
-        stream.Write(Encoding.Latin1.GetBytes("--" + boundary + "\r\n"));
-        stream.Write(Encoding.Latin1.GetBytes("Content-Type: image/png\r\n"));
-        stream.Write(Encoding.Latin1.GetBytes(
-            "Content-Disposition: form-data; name=\"image\"; filename=\"" + fileName + "\"\r\n"));
-        stream.Write(Encoding.Latin1.GetBytes("\r\n"));
-        stream.Write(imageData);
-        stream.Write(Encoding.Latin1.GetBytes("\r\n"));
-        stream.Write(Encoding.Latin1.GetBytes("--" + boundary + "\r\n"));
-        stream.Write(Encoding.Latin1.GetBytes("Content-Disposition: form-data; name=\"type\"\r\n"));
-        stream.Write(Encoding.Latin1.GetBytes("\r\n"));
-        stream.Write(Encoding.UTF8.GetBytes("file"));
-        stream.Write(Encoding.Latin1.GetBytes("\r\n"));
-        stream.Write(Encoding.Latin1.GetBytes("--" + boundary + "\r\n"));
-        stream.Write(Encoding.Latin1.GetBytes("Content-Disposition: form-data; name=\"title\"\r\n"));
-        stream.Write(Encoding.Latin1.GetBytes("\r\n"));
-        stream.Write(Encoding.UTF8.GetBytes(baseName));
-        stream.Write(Encoding.Latin1.GetBytes("\r\n"));
-        stream.Write(Encoding.Latin1.GetBytes("--" + boundary + "--\r\n"));
-        return stream.ToArray();
-    }
-
-    private static string Truncate(string body) => body.Length > 4096 ? body[..4096] : body;
 }
 
 /// <summary>The album half of ImgurAPI::makeAlbum (the Net::Request + RPC::Sink&lt;AlbumResult&gt;
 /// pair): posts the uploaded screenshots' delete hashes.</summary>
 public sealed class ImgurAlbumCreation(
-    ImgurApi.AlbumResult result,
+    ImgurAlbumResult result,
     IReadOnlyList<ScreenShot> screenshots,
-    HttpClient http,
-    string? baseUrl = null,
-    string? clientId = null)
+    ImgurClient imgur,
+    HttpClient http)
 {
-    private readonly string _clientId = clientId ?? FlintConfig.Default.ImgurClientId;
-
-    /// <summary>The imgur endpoint: BuildConfig.IMGUR_BASE_URL + "album".</summary>
-    public string EndpointUrl
-    {
-        get => field + "album";
-    } = baseUrl ?? FlintConfig.Default.ImgurBaseUrl;
-
-    /// <summary>Creates the album; on success <c>result</c> carries its delete hash and id.</summary>
+    /// <summary>Creates the album; on success <c>result</c> carries its delete hash and id. A
+    /// failure surfaces as <see cref="ImgurApiException"/>.</summary>
     public async Task CreateAsync(CancellationToken cancellationToken = default)
     {
-        // Port of getPayload(): "deletehashes=" + hashes.join("&deletehashes=")
-        //                     + "&title=Minecraft%20Screenshots&privacy=hidden"
         var hashes = screenshots.Select(shot => shot.ImgurDeleteHash).ToArray();
-        var data = "deletehashes=" + string.Join("&deletehashes=", hashes) +
-                   "&title=Minecraft%20Screenshots&privacy=hidden";
-
-        using var message = new HttpRequestMessage(HttpMethod.Post, EndpointUrl);
-        message.Headers.TryAddWithoutValidation("Authorization", $"Client-ID {_clientId}");
-        message.Headers.TryAddWithoutValidation("Accept", "application/json");
-        // HttpClient emits Content-Type only from the content headers.
-        message.Content = new ByteArrayContent(Encoding.UTF8.GetBytes(data));
-        message.Content.Headers.TryAddWithoutValidation("Content-Type", "application/x-www-form-urlencoded");
-
-        // the inactivity window (RequestTimeout): the transport's retry gate arms it with
-        // its configured length and covers the send with it
-        using var window = new RetryHandler.Window(message, cancellationToken);
-        using var response = await http.SendAsync(message, HttpCompletionOption.ResponseHeadersRead,
-            window.Token).ConfigureAwait(false);
-        var statusCode = (int)response.StatusCode;
-        string responseBody;
-        try
+        var data = await imgur.Albums.Create(hashes).SendOnceAsync(http, cancellationToken).ConfigureAwait(false);
+        if (data is not null)
         {
-            responseBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-        }
-        catch (IOException)
-        {
-            responseBody = "";
-        }
-
-        if (statusCode is not 200 and not 201 and not 202 and not 203 and not 206)
-        {
-            throw new InvalidOperationException($"HTTP status {statusCode} for {EndpointUrl}");
-        }
-
-        // Port of the RPC::Sink<AlbumResult> parse function.
-        ImgurResponseJson? reply;
-        try
-        {
-            reply = JsonSerializer.Deserialize(responseBody, ImgurJsonContext.Default.ImgurResponseJson);
-        }
-        catch (JsonException)
-        {
-            throw new InvalidOperationException("Invalid json reply");
-        }
-
-        if (reply?.Success != true)
-        {
-            throw new InvalidOperationException("Failed to create album");
-        }
-
-        if (reply.Data is { } albumData)
-        {
-            result.DeleteHash = albumData.DeleteHash ?? "";
-            result.Id = albumData.Id ?? "";
+            result.DeleteHash = data.DeleteHash ?? "";
+            result.Id = data.Id ?? "";
         }
     }
 }

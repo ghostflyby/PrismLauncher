@@ -23,13 +23,12 @@
 // (IndexedPack/IndexedVersion) and its parser. The safeName is the C++ normalized pack
 // image name ("[^A-Za-z0-9]" stripped, lowercased, ".png" appended). The wire shape is
 // annotated on the model properties; deserialization goes through the AtLauncherJsonContext
-// (AtLauncherApi.cs).
+// (AtLauncherJson.cs).
 
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
-using FlintLauncher.Core.Json;
 
-namespace FlintLauncher.Core.ModPlatform.AtLauncher;
+namespace FlintLauncher.ExternalApi.AtLauncher;
 
 public sealed class IndexedVersion
 {
@@ -52,11 +51,9 @@ public sealed class IndexedPack
 
     public required List<IndexedVersion> Versions { get; init; }
 
-    [JsonConverter(typeof(QtCoercingBoolConverter))]
     public bool System { get; set; }
 
-    [JsonConverter(typeof(QtCoercingStringConverter))]
-    public string Description { get; set; } = "";
+    public string? Description { get; set; }
 
     // [JsonIgnore]: with the naming policy the computed getter's name ("type") would
     // collide with TypeRaw's explicit wire name

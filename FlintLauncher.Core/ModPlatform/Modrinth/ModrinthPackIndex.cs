@@ -90,9 +90,7 @@ public static class ModrinthPackIndex
     }
 
     /// <summary>Port of Modrinth::loadIndexedPackVersion. The wire's required members are
-    /// enforced by the model itself (missing keys fail the decode), so the former
-    /// require-is-type checks are gone; a JSON null hash value still counts as absent and
-    /// the sha512 -> sha1 fallback keeps walking.</summary>
+    /// enforced by the model itself (a missing key fails the decode).</summary>
     public static IndexedVersion LoadIndexedPackVersion(ModrinthVersion dto, string preferredHashType = "sha512",
         string preferredFileName = "")
     {
@@ -151,7 +149,9 @@ public static class ModrinthPackIndex
             file.Dependencies.Add(dependency);
         }
 
-        var files = dto.Files;
+        // the context's nullability checks are property-level, so a null file element can
+        // still bind into the list
+        var files = dto.Files.Where(file => file is not null).ToList();
         var fileCount = files.Count;
 
         if (fileCount == 0)
@@ -189,9 +189,7 @@ public static class ModrinthPackIndex
         file.IsPreferred = parent.Primary || fileCount == 1;
         var hashList = parent.Hashes;
 
-        // a JSON null hash value counts as absent (the former node model: null is not
-        // { }), so the fallback chain keeps walking
-        if (hashList.TryGetValue(preferredHashType, out var preferredHash))
+        if (hashList.TryGetValue(preferredHashType, out var preferredHash) && preferredHash is not null)
         {
             file.Hash = preferredHash;
             file.HashType = preferredHashType;
@@ -201,7 +199,7 @@ public static class ModrinthPackIndex
             var hashTypes = ProviderCapabilities.HashType(ResourceProvider.Modrinth);
             foreach (var hashType in hashTypes)
             {
-                if (!hashList.TryGetValue(hashType, out var hash)) continue;
+                if (!hashList.TryGetValue(hashType, out var hash) || hash is null) continue;
                 file.Hash = hash;
                 file.HashType = hashType;
                 break;

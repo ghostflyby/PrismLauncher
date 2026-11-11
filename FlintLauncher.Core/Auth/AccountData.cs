@@ -274,27 +274,9 @@ public sealed class AccountData
         return obj.TryGetPropertyValue(key, out var node) ? node : null;
     }
 
-    // The QJsonValue probing helpers below serve the AUTH PROTOCOL responses (the MSA
-    // device-code/token endpoints, the XSTS display claims — every caller is an auth step
-    // or Parsers), not the accounts.json wire; that one is the typed AccountWire set.
-
-    /// <summary>QJsonValue::isDouble() equivalent (missing key -> undefined -> false). Note:
-    /// JsonValue.TryGetValue only matches the stored primitive type, so every numeric storage
-    /// kind is probed (values created via JsonValue.Create(long) must read back as numbers).</summary>
-    internal static bool IsNumber(JsonNode? node)
-    {
-        if (node is not JsonValue value)
-        {
-            return false;
-        }
-
-        return value.TryGetValue<double>(out _) || value.TryGetValue<long>(out _) ||
-               value.TryGetValue<int>(out _) || value.TryGetValue<decimal>(out _) ||
-               value.TryGetValue<float>(out _) || value.TryGetValue<short>(out _) ||
-               value.TryGetValue<uint>(out _) || value.TryGetValue<ulong>(out _) ||
-               value.TryGetValue<ushort>(out _) || value.TryGetValue<byte>(out _) ||
-               value.TryGetValue<sbyte>(out _);
-    }
+    // The QJsonValue probing helpers below serve the AUTH PROTOCOL responses (the session
+    // server's texture payload — Parsers), not the accounts.json wire; that one is the typed
+    // AccountWire set.
 
     internal static bool IsString(JsonNode? node)
     {
@@ -304,54 +286,6 @@ public sealed class AccountData
     internal static string GetString(JsonNode? node)
     {
         return node is JsonValue value && value.TryGetValue<string>(out var s) ? s : "";
-    }
-
-    internal static double GetNumber(JsonNode? node)
-    {
-        if (node is JsonValue value)
-        {
-            if (value.TryGetValue<double>(out var d))
-            {
-                return d;
-            }
-
-            if (value.TryGetValue<long>(out var l))
-            {
-                return l;
-            }
-
-            if (value.TryGetValue<int>(out var i))
-            {
-                return i;
-            }
-
-            if (value.TryGetValue<decimal>(out var m))
-            {
-                return (double)m;
-            }
-
-            if (value.TryGetValue<float>(out var f))
-            {
-                return f;
-            }
-        }
-
-        return 0;
-    }
-
-    /// <summary>QJsonValue::toInt() equivalent (0 for anything that is not an integral number).</summary>
-    internal static int EnsureInteger(JsonObject obj, string key)
-    {
-        var node = Get(obj, key);
-        if (IsNumber(node))
-        {
-            var d = GetNumber(node);
-            // the exact integral check IS the QJsonValue::toInt contract (0 for anything else)
-            // ReSharper disable once CompareOfFloatsByEqualityOperator
-            return (int)d == d ? (int)d : 0;
-        }
-
-        return 0;
     }
 
     // ------------------------------------------------------------- (de)serialization
@@ -577,13 +511,6 @@ public sealed class AccountData
     internal static string GetString(JsonElement element)
     {
         return element.ValueKind == JsonValueKind.String ? element.GetString() ?? "" : "";
-    }
-
-    /// <summary>An owned immutable copy of a node as an extra-bag value (the former
-    /// DeepClone; the JSON text round-trip keeps the exact value).</summary>
-    internal static JsonElement ToElement(JsonNode? node)
-    {
-        return JsonDocument.Parse(node?.ToJsonString() ?? "null").RootElement.Clone();
     }
 
     /// <summary>An extra-bag string value built without touching the reflection serializer

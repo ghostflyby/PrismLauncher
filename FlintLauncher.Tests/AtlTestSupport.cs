@@ -11,7 +11,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.IO;
-using FlintLauncher.Core.ModPlatform.AtLauncher;
+using FlintLauncher.ExternalApi.AtLauncher;
 using TruePath;
 using Xunit;
 

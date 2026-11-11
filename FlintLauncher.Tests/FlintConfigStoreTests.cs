@@ -16,6 +16,7 @@ using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Secrets;
 using FlintLauncher.Core.Settings;
 using FlintLauncher.Core.State;
+using FlintLauncher.ExternalApi.Paste;
 using FlintLauncher.Web;
 using TruePath;
 using TruePath.SystemIo;
@@ -62,7 +63,7 @@ public class FlintConfigStoreTests : IDisposable
         Assert.Equal("None", resolved.Proxy.ProxyType);
         Assert.Equal("127.0.0.1", resolved.Proxy.ProxyAddr);
         Assert.Equal(8080, resolved.Proxy.ProxyPort);
-        Assert.Equal((int)PasteUpload.PasteType.Mclogs, resolved.Api.PastebinType);
+        Assert.Equal((int)PasteType.Mclogs, resolved.Api.PastebinType);
         Assert.NotNull(resolved.MinecraftMisc.Env);
         Assert.Empty(resolved.MinecraftMisc.Env);
         Assert.Equal("[]", resolved.ModDownload.ModUpdateReleaseTypes);

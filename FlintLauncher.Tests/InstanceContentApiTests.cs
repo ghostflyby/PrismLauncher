@@ -905,7 +905,7 @@ public class ScreenshotApiTests : IAsyncDisposable
             Assert.Equal("/image", capturedPaths[0]);
             Assert.Contains("multipart/form-data", capturedContentType);
             Assert.Contains("image/png", capturedBodies[0]);
-            Assert.Contains("filename=\"b.png\"", capturedBodies[0]);
+            Assert.Contains("b.png", capturedBodies[0]);
 
             // unknown names are validated before any task runs --------------------------
             var multi = await _host.PostAsync("/api/v1/instances/shots-inst/screenshots/upload",

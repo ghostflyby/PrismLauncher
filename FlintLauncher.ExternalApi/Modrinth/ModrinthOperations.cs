@@ -22,15 +22,14 @@ internal static class ModrinthRequests
     }
 }
 
-/// <summary>The shared decode of the JSON operations: the success gate, then strict
-/// source-generated streaming decode — a JSON null document fails like any shape
-/// mismatch.</summary>
+/// <summary>The strict source-generated streaming decode of the JSON operations — a JSON
+/// null document fails like any shape mismatch. Status handling stays with each
+/// operation.</summary>
 internal static class ModrinthDecoding
 {
     internal static async Task<T> ReadJsonAsync<T>(HttpResponseMessage response,
         JsonTypeInfo<T> typeInfo, CancellationToken ct) where T : class
     {
-        await ApiOperation.EnsureSuccessAsync(response, ct).ConfigureAwait(false);
         await using var body = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
         return await JsonSerializer.DeserializeAsync(body, typeInfo, ct).ConfigureAwait(false)
                ?? throw new JsonException("the response body is null");
@@ -51,8 +50,12 @@ public readonly record struct ModrinthFileVersionQuery(
 
     public Exception WrapFailure(Exception failure) => new ModrinthApiException(failure.Message, failure);
 
-    public Task<ModrinthVersion> ReadResponseAsync(HttpResponseMessage response, CancellationToken ct) =>
-        ModrinthDecoding.ReadJsonAsync<ModrinthVersion>(response, ModrinthJsonContext.Default.ModrinthVersion, ct);
+    public async Task<ModrinthVersion> ReadResponseAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        await response.EnsureSuccessAsync(ct).ConfigureAwait(false);
+        return await ModrinthDecoding.ReadJsonAsync(response, ModrinthJsonContext.Default.ModrinthVersion, ct)
+            .ConfigureAwait(false);
+    }
 }
 
 /// <summary>POST /version_files — the versions for a batch of file hashes; an empty hash
@@ -77,10 +80,13 @@ public readonly record struct ModrinthFileVersionLookupQuery(
 
     public Exception WrapFailure(Exception failure) => new ModrinthApiException(failure.Message, failure);
 
-    public Task<Dictionary<string, ModrinthVersion>> ReadResponseAsync(HttpResponseMessage response,
-        CancellationToken ct) =>
-        ModrinthDecoding.ReadJsonAsync<Dictionary<string, ModrinthVersion>>(response,
-            ModrinthJsonContext.Default.DictionaryStringModrinthVersion, ct);
+    public async Task<Dictionary<string, ModrinthVersion>> ReadResponseAsync(HttpResponseMessage response,
+        CancellationToken ct)
+    {
+        await response.EnsureSuccessAsync(ct).ConfigureAwait(false);
+        return await ModrinthDecoding.ReadJsonAsync(response,
+            ModrinthJsonContext.Default.DictionaryStringModrinthVersion, ct).ConfigureAwait(false);
+    }
 }
 
 /// <summary>POST /version_files/update — the latest versions for a batch of file hashes;
@@ -111,10 +117,13 @@ public readonly record struct ModrinthLatestVersionsQuery(
 
     public Exception WrapFailure(Exception failure) => new ModrinthApiException(failure.Message, failure);
 
-    public Task<Dictionary<string, ModrinthVersion>> ReadResponseAsync(HttpResponseMessage response,
-        CancellationToken ct) =>
-        ModrinthDecoding.ReadJsonAsync<Dictionary<string, ModrinthVersion>>(response,
-            ModrinthJsonContext.Default.DictionaryStringModrinthVersion, ct);
+    public async Task<Dictionary<string, ModrinthVersion>> ReadResponseAsync(HttpResponseMessage response,
+        CancellationToken ct)
+    {
+        await response.EnsureSuccessAsync(ct).ConfigureAwait(false);
+        return await ModrinthDecoding.ReadJsonAsync(response,
+            ModrinthJsonContext.Default.DictionaryStringModrinthVersion, ct).ConfigureAwait(false);
+    }
 }
 
 /// <summary>GET /version/{id} — one pinned version (the dependency lookup).</summary>
@@ -127,8 +136,12 @@ public readonly record struct ModrinthVersionQuery(ModrinthClientOptions Options
 
     public Exception WrapFailure(Exception failure) => new ModrinthApiException(failure.Message, failure);
 
-    public Task<ModrinthVersion> ReadResponseAsync(HttpResponseMessage response, CancellationToken ct) =>
-        ModrinthDecoding.ReadJsonAsync<ModrinthVersion>(response, ModrinthJsonContext.Default.ModrinthVersion, ct);
+    public async Task<ModrinthVersion> ReadResponseAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        await response.EnsureSuccessAsync(ct).ConfigureAwait(false);
+        return await ModrinthDecoding.ReadJsonAsync(response, ModrinthJsonContext.Default.ModrinthVersion, ct)
+            .ConfigureAwait(false);
+    }
 }
 
 /// <summary>GET /project/{id}/version — the version list behind a project, filtered by
@@ -161,8 +174,12 @@ public readonly record struct ModrinthVersionListQuery(
 
     public Exception WrapFailure(Exception failure) => new ModrinthApiException(failure.Message, failure);
 
-    public Task<List<ModrinthVersion>> ReadResponseAsync(HttpResponseMessage response, CancellationToken ct) =>
-        ModrinthDecoding.ReadJsonAsync<List<ModrinthVersion>>(response, ModrinthJsonContext.Default.ListModrinthVersion, ct);
+    public async Task<List<ModrinthVersion>> ReadResponseAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        await response.EnsureSuccessAsync(ct).ConfigureAwait(false);
+        return await ModrinthDecoding.ReadJsonAsync(response, ModrinthJsonContext.Default.ListModrinthVersion, ct)
+            .ConfigureAwait(false);
+    }
 }
 
 // ------------------------------------------------------------------------------ projects
@@ -177,8 +194,12 @@ public readonly record struct ModrinthProjectQuery(ModrinthClientOptions Options
 
     public Exception WrapFailure(Exception failure) => new ModrinthApiException(failure.Message, failure);
 
-    public Task<ModrinthProject> ReadResponseAsync(HttpResponseMessage response, CancellationToken ct) =>
-        ModrinthDecoding.ReadJsonAsync<ModrinthProject>(response, ModrinthJsonContext.Default.ModrinthProject, ct);
+    public async Task<ModrinthProject> ReadResponseAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        await response.EnsureSuccessAsync(ct).ConfigureAwait(false);
+        return await ModrinthDecoding.ReadJsonAsync(response, ModrinthJsonContext.Default.ModrinthProject, ct)
+            .ConfigureAwait(false);
+    }
 }
 
 /// <summary>GET /projects?ids=[...] — the projects for a batch of ids.</summary>
@@ -190,8 +211,12 @@ public readonly record struct ModrinthProjectsQuery(ModrinthClientOptions Option
 
     public Exception WrapFailure(Exception failure) => new ModrinthApiException(failure.Message, failure);
 
-    public Task<List<ModrinthProject>> ReadResponseAsync(HttpResponseMessage response, CancellationToken ct) =>
-        ModrinthDecoding.ReadJsonAsync<List<ModrinthProject>>(response, ModrinthJsonContext.Default.ListModrinthProject, ct);
+    public async Task<List<ModrinthProject>> ReadResponseAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        await response.EnsureSuccessAsync(ct).ConfigureAwait(false);
+        return await ModrinthDecoding.ReadJsonAsync(response, ModrinthJsonContext.Default.ListModrinthProject, ct)
+            .ConfigureAwait(false);
+    }
 }
 
 /// <summary>GET /project/{id}/description — the project body as plain text; a failed
@@ -230,8 +255,12 @@ public readonly record struct ModrinthCategoriesQuery(ModrinthClientOptions Opti
 
     public Exception WrapFailure(Exception failure) => new ModrinthApiException(failure.Message, failure);
 
-    public Task<List<ModrinthCategory>> ReadResponseAsync(HttpResponseMessage response, CancellationToken ct) =>
-        ModrinthDecoding.ReadJsonAsync<List<ModrinthCategory>>(response, ModrinthJsonContext.Default.ListModrinthCategory, ct);
+    public async Task<List<ModrinthCategory>> ReadResponseAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        await response.EnsureSuccessAsync(ct).ConfigureAwait(false);
+        return await ModrinthDecoding.ReadJsonAsync(response, ModrinthJsonContext.Default.ListModrinthCategory, ct)
+            .ConfigureAwait(false);
+    }
 }
 
 /// <summary>GET /search — the search envelope: the page offset, the free text, the sort
@@ -276,8 +305,12 @@ public readonly record struct ModrinthSearchQuery(
 
     public Exception WrapFailure(Exception failure) => new ModrinthApiException(failure.Message, failure);
 
-    public Task<ModrinthSearchResults> ReadResponseAsync(HttpResponseMessage response, CancellationToken ct) =>
-        ModrinthDecoding.ReadJsonAsync<ModrinthSearchResults>(response, ModrinthJsonContext.Default.ModrinthSearchResults, ct);
+    public async Task<ModrinthSearchResults> ReadResponseAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        await response.EnsureSuccessAsync(ct).ConfigureAwait(false);
+        return await ModrinthDecoding.ReadJsonAsync(response, ModrinthJsonContext.Default.ModrinthSearchResults, ct)
+            .ConfigureAwait(false);
+    }
 }
 
 // ----------------------------------------------------------------------------- downloads
@@ -311,7 +344,7 @@ public readonly record struct ModrinthFileDownload(
     public async Task<long> ReadResponseAsync(string destinationPath, HttpResponseMessage response,
         CancellationToken ct)
     {
-        await ApiOperation.EnsureSuccessAsync(response, ct).ConfigureAwait(false);
+        await response.EnsureSuccessAsync(ct).ConfigureAwait(false);
         await using var body = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
 
         var tempPath = destinationPath + ".download";

@@ -10,6 +10,8 @@
 // unparseable input; an invalid/empty skin URL therefore takes the failure branch directly
 // (still ending in the upstream Working/"Got skin" report).
 
+using FlintLauncher.ExternalApi.Mojang;
+
 namespace FlintLauncher.Core.Auth;
 
 public sealed class GetSkinStep(AccountData data, AuthEndpointsOptions? auth = null) : AuthStep(data)
@@ -22,14 +24,18 @@ public sealed class GetSkinStep(AccountData data, AuthEndpointsOptions? auth = n
     {
         if (Uri.TryCreate(Data.MinecraftProfile.SkinField.Url, UriKind.Absolute, out var url))
         {
-            var response = await AuthStepHttp.SendAsync(new AuthStepRequest
+            // upstream reports success even when the download failed
+            try
             {
-                Url = url,
-                AutoRetry = true,
-            }, _auth.Http, cancellationToken).ConfigureAwait(false);
-            if (response.Success)
+                var data = await AuthStepHttp.SendAsync(_auth.Mojang.Textures.Get(url), _auth.Http,
+                    autoRetry: true, cancellationToken).ConfigureAwait(false);
+                if (data is not null)
+                {
+                    Data.MinecraftProfile.SkinField.Data = data;
+                }
+            }
+            catch (MojangApiException)
             {
-                Data.MinecraftProfile.SkinField.Data = response.Body;
             }
         }
 

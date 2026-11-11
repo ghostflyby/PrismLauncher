@@ -22,15 +22,14 @@ internal static class FlameRequests
     }
 }
 
-/// <summary>The shared decode of the JSON operations: the success gate, then strict
-/// source-generated streaming decode — a JSON null document fails like any shape
-/// mismatch.</summary>
+/// <summary>The strict source-generated streaming decode of the JSON operations — a JSON
+/// null document fails like any shape mismatch. Status handling stays with each
+/// operation.</summary>
 internal static class FlameDecoding
 {
     internal static async Task<T> ReadJsonAsync<T>(HttpResponseMessage response,
         JsonTypeInfo<T> typeInfo, CancellationToken ct) where T : class
     {
-        await ApiOperation.EnsureSuccessAsync(response, ct).ConfigureAwait(false);
         await using var body = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
         return await JsonSerializer.DeserializeAsync(body, typeInfo, ct).ConfigureAwait(false)
                ?? throw new JsonException("the response body is null");
@@ -49,8 +48,12 @@ public readonly record struct FlameProjectQuery(FlameClientOptions Options, stri
 
     public Exception WrapFailure(Exception failure) => new FlameApiException(failure.Message, failure);
 
-    public Task<FlameProjectEnvelope> ReadResponseAsync(HttpResponseMessage response, CancellationToken ct) =>
-        FlameDecoding.ReadJsonAsync(response, FlameJsonContext.Default.FlameProjectEnvelope, ct);
+    public async Task<FlameProjectEnvelope> ReadResponseAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        await response.EnsureSuccessAsync(ct).ConfigureAwait(false);
+        return await FlameDecoding.ReadJsonAsync(response, FlameJsonContext.Default.FlameProjectEnvelope, ct)
+            .ConfigureAwait(false);
+    }
 }
 
 /// <summary>POST /mods — the projects for a batch of ids (the decimal-string body
@@ -70,8 +73,12 @@ public readonly record struct FlameProjectsQuery(FlameClientOptions Options, IRe
 
     public Exception WrapFailure(Exception failure) => new FlameApiException(failure.Message, failure);
 
-    public Task<FlameProjectList> ReadResponseAsync(HttpResponseMessage response, CancellationToken ct) =>
-        FlameDecoding.ReadJsonAsync(response, FlameJsonContext.Default.FlameProjectList, ct);
+    public async Task<FlameProjectList> ReadResponseAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        await response.EnsureSuccessAsync(ct).ConfigureAwait(false);
+        return await FlameDecoding.ReadJsonAsync(response, FlameJsonContext.Default.FlameProjectList, ct)
+            .ConfigureAwait(false);
+    }
 }
 
 /// <summary>GET /mods/{id}/description — the project body as the {"data": string} envelope;
@@ -110,8 +117,12 @@ public readonly record struct FlameFileQuery(FlameClientOptions Options, string 
 
     public Exception WrapFailure(Exception failure) => new FlameApiException(failure.Message, failure);
 
-    public Task<FlameFileEnvelope> ReadResponseAsync(HttpResponseMessage response, CancellationToken ct) =>
-        FlameDecoding.ReadJsonAsync(response, FlameJsonContext.Default.FlameFileEnvelope, ct);
+    public async Task<FlameFileEnvelope> ReadResponseAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        await response.EnsureSuccessAsync(ct).ConfigureAwait(false);
+        return await FlameDecoding.ReadJsonAsync(response, FlameJsonContext.Default.FlameFileEnvelope, ct)
+            .ConfigureAwait(false);
+    }
 }
 
 /// <summary>POST /mods/files — the files for a batch of ids (the decimal-string body
@@ -131,8 +142,12 @@ public readonly record struct FlameFilesQuery(FlameClientOptions Options, IReadO
 
     public Exception WrapFailure(Exception failure) => new FlameApiException(failure.Message, failure);
 
-    public Task<FlameFileList> ReadResponseAsync(HttpResponseMessage response, CancellationToken ct) =>
-        FlameDecoding.ReadJsonAsync(response, FlameJsonContext.Default.FlameFileList, ct);
+    public async Task<FlameFileList> ReadResponseAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        await response.EnsureSuccessAsync(ct).ConfigureAwait(false);
+        return await FlameDecoding.ReadJsonAsync(response, FlameJsonContext.Default.FlameFileList, ct)
+            .ConfigureAwait(false);
+    }
 }
 
 /// <summary>GET /mods/{projectId}/files — the project's file list, filtered by the wire's
@@ -163,8 +178,12 @@ public readonly record struct FlameFileListQuery(
 
     public Exception WrapFailure(Exception failure) => new FlameApiException(failure.Message, failure);
 
-    public Task<FlameFileList> ReadResponseAsync(HttpResponseMessage response, CancellationToken ct) =>
-        FlameDecoding.ReadJsonAsync(response, FlameJsonContext.Default.FlameFileList, ct);
+    public async Task<FlameFileList> ReadResponseAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        await response.EnsureSuccessAsync(ct).ConfigureAwait(false);
+        return await FlameDecoding.ReadJsonAsync(response, FlameJsonContext.Default.FlameFileList, ct)
+            .ConfigureAwait(false);
+    }
 }
 
 /// <summary>GET /mods/{modId}/files/{fileId}/changelog — the changelog as the
@@ -211,8 +230,12 @@ public readonly record struct FlameFingerprintsQuery(FlameClientOptions Options,
 
     public Exception WrapFailure(Exception failure) => new FlameApiException(failure.Message, failure);
 
-    public Task<FlameFingerprintResponse> ReadResponseAsync(HttpResponseMessage response, CancellationToken ct) =>
-        FlameDecoding.ReadJsonAsync(response, FlameJsonContext.Default.FlameFingerprintResponse, ct);
+    public async Task<FlameFingerprintResponse> ReadResponseAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        await response.EnsureSuccessAsync(ct).ConfigureAwait(false);
+        return await FlameDecoding.ReadJsonAsync(response, FlameJsonContext.Default.FlameFingerprintResponse, ct)
+            .ConfigureAwait(false);
+    }
 }
 
 // ---------------------------------------------------------------------------- categories
@@ -228,8 +251,12 @@ public readonly record struct FlameCategoriesQuery(FlameClientOptions Options, i
 
     public Exception WrapFailure(Exception failure) => new FlameApiException(failure.Message, failure);
 
-    public Task<FlameCategoryList> ReadResponseAsync(HttpResponseMessage response, CancellationToken ct) =>
-        FlameDecoding.ReadJsonAsync(response, FlameJsonContext.Default.FlameCategoryList, ct);
+    public async Task<FlameCategoryList> ReadResponseAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        await response.EnsureSuccessAsync(ct).ConfigureAwait(false);
+        return await FlameDecoding.ReadJsonAsync(response, FlameJsonContext.Default.FlameCategoryList, ct)
+            .ConfigureAwait(false);
+    }
 }
 
 // --------------------------------------------------------------------------------- search
@@ -290,8 +317,12 @@ public readonly record struct FlameSearchQuery(
 
     public Exception WrapFailure(Exception failure) => new FlameApiException(failure.Message, failure);
 
-    public Task<FlameProjectList> ReadResponseAsync(HttpResponseMessage response, CancellationToken ct) =>
-        FlameDecoding.ReadJsonAsync(response, FlameJsonContext.Default.FlameProjectList, ct);
+    public async Task<FlameProjectList> ReadResponseAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        await response.EnsureSuccessAsync(ct).ConfigureAwait(false);
+        return await FlameDecoding.ReadJsonAsync(response, FlameJsonContext.Default.FlameProjectList, ct)
+            .ConfigureAwait(false);
+    }
 }
 
 // -------------------------------------------------------------------------------- groups

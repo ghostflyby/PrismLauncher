@@ -8,14 +8,14 @@
 // reusing the TechnicTestSupport fixture builders, since the endpoint runs the very same
 // SingleZipPackInstallTask / SolderPackInstallTask the core tests drive directly.
 //
-// Every host gets its own TechnicApi client pointed at the stub (BaseUrl/ApiBuild are
+// Every host gets its own TechnicClient pointed at the stub (BaseUrl/ApiBuild are
 // per-instance state now, so no [Collection] serialization is needed anymore).
 
 using System.Net;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using FlintLauncher.Core.ModPlatform.Technic;
+using FlintLauncher.ExternalApi.Technic;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -23,11 +23,11 @@ namespace FlintLauncher.Tests;
 public class TechnicApiEndpointsTests : IDisposable
 {
     private readonly StubTechnicServer _server = new();
-    private readonly TechnicApi _api;
+    private readonly TechnicClient _api;
 
     public TechnicApiEndpointsTests()
     {
-        _api = new TechnicApi(TestNet.Http) { BaseUrl = _server.Url + "/", ApiBuild = "testbuild" };
+        _api = new TechnicClient(new TechnicClientOptions { BaseUrl = _server.Url + "/", ApiBuild = "testbuild" });
     }
 
     public void Dispose()
@@ -91,7 +91,7 @@ public class TechnicApiEndpointsTests : IDisposable
         SeedSearchList();
         // a dead base on the injected client forces the query's serverUrl override to be
         // the only working route
-        var api = new TechnicApi(TestNet.Http) { BaseUrl = "http://127.0.0.1:9/", ApiBuild = "testbuild" };
+        var api = new TechnicClient(new TechnicClientOptions { BaseUrl = "http://127.0.0.1:9/", ApiBuild = "testbuild" });
         await using var host = await FlintApiHost.StartAsync(technic: api);
 
         var response = await host.GetAsync(
@@ -99,7 +99,7 @@ public class TechnicApiEndpointsTests : IDisposable
         response.EnsureSuccessStatusCode();
         Assert.Equal("/search", _server.LastPath);
         // the override is a per-request derived client: the injected client's base is untouched
-        Assert.Equal("http://127.0.0.1:9/", api.BaseUrl);
+        Assert.Equal("http://127.0.0.1:9/", api.Options.BaseUrl);
     }
 
     [Fact]
@@ -354,7 +354,7 @@ public class TechnicApiEndpointsTests : IDisposable
         _server.Downloads[zipName] = await File.ReadAllBytesAsync(zipPath);
         try
         {
-            var api = new TechnicApi(TestNet.Http) { BaseUrl = "http://127.0.0.1:9/", ApiBuild = "testbuild" };
+            var api = new TechnicClient(new TechnicClientOptions { BaseUrl = "http://127.0.0.1:9/", ApiBuild = "testbuild" });
             await using var host = await FlintApiHost.StartAsync(technic: api);
 
             var post = await host.PostAsync("/api/v1/modplatform/technic/install", new
@@ -368,7 +368,7 @@ public class TechnicApiEndpointsTests : IDisposable
             Assert.True(File.Exists(Path.Combine(host.DataDir, "instances", "Override Installed",
                 "minecraft", "modpack", "options.txt")));
             // the override never leaked into the injected client (the bogus base is still in place)
-            Assert.Equal("http://127.0.0.1:9/", api.BaseUrl);
+            Assert.Equal("http://127.0.0.1:9/", api.Options.BaseUrl);
         }
         finally
         {

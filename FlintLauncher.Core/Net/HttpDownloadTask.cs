@@ -128,7 +128,7 @@ public sealed class HttpDownloadTask(
         // chunk read below renews it, so a steady transfer runs unbounded and only a real
         // stall fails.
         using var message = new HttpRequestMessage(HttpMethod.Get, Url);
-        using var window = new RetryHandler.Window(message, cancellationToken);
+        using var window = new RetryHandler.Window(cancellationToken);
 
         try
         {
@@ -147,6 +147,7 @@ public sealed class HttpDownloadTask(
 
             message.Options.Set(RetryHandler.ManualRetryOption, true);
             message.Options.Set(RetryHandler.AutoRetryOption, options.HasFlag(RequestOptions.AutoRetry));
+            message.Options.Set(RetryHandler.TimeoutSourceOption, window);
 
             using var response = await http.SendAsync(message, HttpCompletionOption.ResponseHeadersRead,
                 window.Token).ConfigureAwait(false);

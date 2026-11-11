@@ -45,6 +45,7 @@ using FlintLauncher.Core.ModPlatform.Flame;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
 using FlintLauncher.ExternalApi.Flame;
+using FlintLauncher.ExternalApi.Ftb;
 using FlintLauncher.ExternalApi.Modrinth;
 using TruePath;
 using TruePath.SystemIo;
@@ -57,11 +58,11 @@ public sealed class FtbPackInstallTask(
     ModrinthClient modrinth,
     HttpClient http,
     FlameClient? flame = null,
-    FtbApi? ftb = null)
+    FtbClient? ftb = null)
     : InstanceTask
 {
     private readonly FlameClient _flame = flame ?? new FlameClient();
-    private readonly FtbApi _ftb = ftb ?? new FtbApi(http);
+    private readonly FtbClient _ftb = ftb ?? new FtbClient();
 
     // assigned by OnManifestDownloadSucceeded before any read
     private FtbVersion? _manifest;
@@ -101,30 +102,19 @@ public sealed class FtbPackInstallTask(
             throw new InvalidOperationException($"Failed to find pack version {versionName}");
         }
 
-        string manifest;
-        try
-        {
-            manifest = await _ftb.FetchVersionAsync(pack.Id, versionInfo.Id, cancellationToken);
-        }
-        catch (FlintHttpException e)
-        {
-            throw new InvalidOperationException(e.Reason);
-        }
-
-        await OnManifestDownloadSucceeded(manifest, cancellationToken);
-    }
-
-    private async Task OnManifestDownloadSucceeded(string response, CancellationToken cancellationToken)
-    {
         try
         {
             // the deserialized payload replaces the (not yet populated) manifest wholesale;
             // reads below only run after this assignment
-            _manifest = FtbApi.LoadVersion(response);
+            _manifest = await _ftb.Packs.Version(pack.Id, versionInfo.Id).FetchAsync(http, cancellationToken);
         }
-        catch (JsonException e)
+        catch (FtbApiException e) when (e.InnerException is JsonException)
         {
-            throw new InvalidOperationException("Could not understand pack manifest:\n" + e.Message);
+            throw new InvalidOperationException("Could not understand pack manifest:\n" + e.Message, e);
+        }
+        catch (FtbApiException e)
+        {
+            throw new InvalidOperationException(e.Message, e);
         }
 
         await ResolveMods(cancellationToken);
@@ -140,17 +130,17 @@ public sealed class FtbPackInstallTask(
         var flameManifest = new FlameManifest();
         foreach (var file in Manifest.Files)
         {
-            if (file is { ServerOnly: false, Url.Length: 0 })
+            if (file is { ServerOnly: false, Url: null or "" })
             {
-                if (file.Curseforge.FileId <= 0)
+                if (file.CurseforgeRaw is not { FileId: > 0 } curseforge)
                 {
                     throw new InvalidOperationException($"Invalid manifest: There's no information available to download the file '{file.Name}'!");
                 }
 
                 var flameFile = new FlameFile
                 {
-                    ProjectId = file.Curseforge.ProjectId,
-                    FileId = file.Curseforge.FileId,
+                    ProjectId = curseforge.ProjectId,
+                    FileId = curseforge.FileId,
                 };
 
                 flameManifest.Files.Add(flameFile.FileId, flameFile);
@@ -300,14 +290,14 @@ public sealed class FtbPackInstallTask(
         var downloads = new List<HttpDownloadTask>();
         foreach (var file in Manifest.Files)
         {
-            if (file.ServerOnly || file.Url.Length == 0)
+            if (file.ServerOnly || string.IsNullOrEmpty(file.Url))
             {
                 continue;
             }
 
             var path = StagingPath / ".minecraft" / file.Path / file.Name;
 
-            var dl = HttpDownloadTask.ToFile(new Uri(file.Url), path, _ftb.Http);
+            var dl = HttpDownloadTask.ToFile(new Uri(file.Url), path, http);
             if (file.Sha1.Length != 0)
             {
                 dl.RequireChecksum(HashAlgorithmName.SHA1, file.Sha1);

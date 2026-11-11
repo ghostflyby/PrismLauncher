@@ -23,12 +23,12 @@ using System.Text.Json;
 using FlintLauncher.Core;
 using FlintLauncher.Core.Auth;
 using FlintLauncher.Core.Launch.Steps;
-using FlintLauncher.Core.ModPlatform.AtLauncher;
-using FlintLauncher.Core.ModPlatform.Ftb;
-using FlintLauncher.Core.ModPlatform.Technic;
 using FlintLauncher.Core.State;
+using FlintLauncher.ExternalApi.AtLauncher;
 using FlintLauncher.ExternalApi.Flame;
+using FlintLauncher.ExternalApi.Ftb;
 using FlintLauncher.ExternalApi.Modrinth;
+using FlintLauncher.ExternalApi.Technic;
 using FlintLauncher.Web;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
@@ -69,7 +69,7 @@ internal sealed class FlintApiHost : IAsyncDisposable
     public string DataDir { get; }
 
     public static async Task<FlintApiHost> StartAsync(ModrinthClient? modrinth = null, FlameClient? flame = null,
-        TechnicApi? technic = null, AtLauncherApi? atlauncher = null, FtbApi? ftb = null,
+        TechnicClient? technic = null, AtLauncherClient? atlauncher = null, FtbClient? ftb = null,
         AuthEndpointsOptions? auth = null, IReadOnlyList<AbsolutePath>? migrationSourceParents = null)
     {
         var homeDir = Path.Combine(Path.GetTempPath(), $"flint-api-{Guid.NewGuid():N}");
@@ -785,8 +785,8 @@ public class FlintApiDeviceCodeTests : IDisposable
             ctx.Response.Close();
         });
 
-        _auth.MsaDeviceCode = _server.Url + "/devicecode";
-        _auth.MsaToken = _server.Url + "/token";
+        _auth.Mojang.Options.MsaDeviceCode = _server.Url + "/devicecode";
+        _auth.Mojang.Options.MsaToken = _server.Url + "/token";
     }
 
     public void Dispose()

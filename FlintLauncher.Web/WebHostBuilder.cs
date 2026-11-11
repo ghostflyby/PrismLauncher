@@ -18,16 +18,17 @@ using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Migration;
-using FlintLauncher.Core.ModPlatform.AtLauncher;
-using FlintLauncher.Core.ModPlatform.Ftb;
-using FlintLauncher.Core.ModPlatform.Technic;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Screenshots;
 using FlintLauncher.Core.Secrets;
 using FlintLauncher.Core.Skins;
 using FlintLauncher.Core.State;
+using FlintLauncher.ExternalApi.AtLauncher;
 using FlintLauncher.ExternalApi.Flame;
+using FlintLauncher.ExternalApi.Ftb;
+using FlintLauncher.ExternalApi.Imgur;
 using FlintLauncher.ExternalApi.Modrinth;
+using FlintLauncher.ExternalApi.Technic;
 using FlintLauncher.Web.Endpoints;
 using FlintLauncher.Web.Logging;
 using FlintLauncher.Web.Models;
@@ -45,9 +46,9 @@ public static class WebHostBuilder
     public static WebApplication BuildWebApplication(string[] args,
         ModrinthClient? modrinth = null,
         FlameClient? flame = null,
-        TechnicApi? technic = null,
-        AtLauncherApi? atlauncher = null,
-        FtbApi? ftb = null,
+        TechnicClient? technic = null,
+        AtLauncherClient? atlauncher = null,
+        FtbClient? ftb = null,
         AuthEndpointsOptions? auth = null,
         FlintPaths? paths = null,
         IReadOnlyList<AbsolutePath>? migrationSourceParents = null)
@@ -135,10 +136,10 @@ public static class WebHostBuilder
         AccountList accounts;
         ModrinthClient modrinthClient;
         FlameClient flameClient;
-        TechnicApi technicClient;
-        AtLauncherApi atLauncherClient;
-        FtbApi ftbClient;
-        ImgurApi imgurClient;
+        TechnicClient technicClient;
+        AtLauncherClient atLauncherClient;
+        FtbClient ftbClient;
+        ImgurClient imgurClient;
         AuthEndpointsOptions authOptions;
         try
         {
@@ -147,10 +148,11 @@ public static class WebHostBuilder
             modrinthClient = modrinth ?? new ModrinthClient();
             authOptions = auth ?? new AuthEndpointsOptions { Http = http };
             flameClient = flame ?? new FlameClient();
-            technicClient = technic ?? new TechnicApi(http);
-            atLauncherClient = atlauncher ?? new AtLauncherApi(http);
-            ftbClient = ftb ?? new FtbApi(http);
-            imgurClient = new ImgurApi(http);
+            technicClient = technic ?? new TechnicClient();
+            atLauncherClient = atlauncher ?? new AtLauncherClient();
+            ftbClient = ftb ?? new FtbClient();
+            // the imgur client carries the product's client id from the build configuration
+            imgurClient = new ImgurClient(new ImgurClientOptions { ClientId = FlintConfig.Default.ImgurClientId });
 
             // the watched-directory tenancy: reconciles are serialized through the instance
             // lock — watch events arrive on threadpool threads and must not race endpoint

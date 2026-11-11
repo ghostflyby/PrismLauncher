@@ -32,9 +32,10 @@ public sealed class RetryHandler : DelegatingHandler
     /// <summary>Opt in to the network-level manual retry gate (NumberOfManualRetries).</summary>
     public static readonly HttpRequestOptionsKey<bool> ManualRetryOption = new("Flint.ManualRetry");
 
-    /// <summary>The request option the gate finds the sender's <see cref="Window"/> under;
-    /// the Window itself installs it, callers never touch this key.</summary>
-    private static readonly HttpRequestOptionsKey<Window> TimeoutSourceOption = new("Flint.TimeoutSource");
+    /// <summary>The sender's <see cref="Window"/> — the inactivity window the gate arms
+    /// before the send and the sender reads the body through; set on the request like the
+    /// retry flags above.</summary>
+    public static readonly HttpRequestOptionsKey<Window> TimeoutSourceOption = new("Flint.TimeoutSource");
 
     /// <summary>The C++ RequestTimeout default: the window when the setting is left
     /// unconfigured, and the clamp fallback for a below-a-second value.</summary>
@@ -128,31 +129,33 @@ public sealed class RetryHandler : DelegatingHandler
                 continue;
             }
 
+            // the headers arrived: a progress checkpoint, so the sender's body read starts
+            // from a fresh countdown
+            window?.Progress();
             return response;
         }
     }
 
-    /// <summary>The exchange-scoped inactivity window: the sender creates it before the
-    /// request goes out (passing its own cancellation token so both end the same channel)
-    /// and keeps it across every post-response read — calling <see cref="Progress"/> at each
-    /// progress checkpoint. Every progress restarts the countdown, so a steady transfer runs
-    /// unbounded and only a real stall fires the cancellation; a pipeline without the gate
-    /// never arms the window, progress no-ops and the exchange ends only through the
-    /// caller's own cancellation.</summary>
+    /// <summary>The exchange-scoped inactivity window: the sender creates it (passing its
+    /// own cancellation token so both end the same channel), sets it on the request under
+    /// <see cref="TimeoutSourceOption"/> and keeps it across every post-response read —
+    /// calling <see cref="Progress"/> at each progress checkpoint. Every progress restarts
+    /// the countdown, so a steady transfer runs unbounded and only a real stall fires the
+    /// cancellation; a pipeline without the gate never arms the window, progress no-ops and
+    /// the exchange ends only through the caller's own cancellation.</summary>
     public sealed class Window : CancellationTokenSource
     {
         private readonly CancellationTokenRegistration _userRegistration;
         private readonly CancellationToken _userToken;
         private TimeSpan _window;
 
-        public Window(HttpRequestMessage request, CancellationToken userToken)
+        public Window(CancellationToken userToken)
         {
             _userToken = userToken;
             // the user's cancellation ends the exchange through this same source; the
             // registration is released on Dispose so a later user cancellation cannot fire
             // into a disposed source
             _userRegistration = userToken.Register(static w => ((Window)w!).Cancel(), this);
-            request.Options.Set(TimeoutSourceOption, this);
         }
 
         /// <summary>The progress checkpoint: restart the countdown from now.</summary>

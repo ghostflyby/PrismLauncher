@@ -456,9 +456,10 @@ public class ModrinthApiTests : IDisposable
     }
 
     [Fact]
-    public void HashLookup_NullPreferredHash_FallsBackToNextAlgorithm()
+    public void HashLookup_NullHashValue_Binds_As_Null()
     {
-        // a JSON null hash value counts as absent: the sha512 -> sha1 fallback keeps walking
+        // native binding keeps a null hash value under its key (no converter drops it); the
+        // consumers treat a null digest as no checksum, the live API sends none
         var dto = JsonSerializer.Deserialize("""
             {
                 "project_id": "p", "id": "v1", "date_published": "2024-01-01T00:00:00Z",
@@ -470,10 +471,8 @@ public class ModrinthApiTests : IDisposable
             }
             """, ModrinthJsonContext.Default.ModrinthVersion);
         Assert.NotNull(dto);
-        var indexed = ModrinthPackIndex.LoadIndexedPackVersion(dto);
-
-        Assert.Equal("sha1", indexed.HashType);
-        Assert.Equal("abc", indexed.Hash);
+        Assert.Null(dto.Files[0].Hashes["sha512"]);
+        Assert.Equal("abc", dto.Files[0].Hashes["sha1"]);
     }
 
     // ------------------------------------------------------- update check

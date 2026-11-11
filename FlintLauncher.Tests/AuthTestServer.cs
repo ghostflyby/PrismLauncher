@@ -40,6 +40,12 @@ internal sealed class AuthStubServer : IDisposable
 
     public DeviceCodeTokenMode TokenMode { get; set; } = DeviceCodeTokenMode.PendingThenSuccess;
 
+    /// <summary>expires_in of the /devicecode answer.</summary>
+    public int DeviceCodeExpiresIn { get; set; } = 900;
+
+    /// <summary>After this many /devicecode answers the endpoint replies 500.</summary>
+    public int DeviceCodeFailAfter { get; set; } = int.MaxValue;
+
     /// <summary>xsts/authorize answers 401 with this XErr code instead of a token (null = success).</summary>
     public long? XErr { get; set; }
 
@@ -189,15 +195,7 @@ internal sealed class AuthStubServer : IDisposable
         var path = recorded.Path;
         var response = (path, recorded.Method) switch
         {
-            ("/devicecode", "POST") => (200, """
-                                             {
-                                                 "device_code": "DEV_CODE_STUB",
-                                                 "user_code": "FLINT-CODE",
-                                                 "verification_uri": "https://microsoft.com/link",
-                                                 "expires_in": 900,
-                                                 "interval": 1
-                                             }
-                                             """),
+            ("/devicecode", "POST") => DeviceCodeResponse(),
             ("/token", "POST") => TokenResponse(),
             ("/user/authenticate", "POST") => (200, XTokenJson),
             ("/xsts/authorize", "POST") => XErr is { } xerr ? (401, XstsErrorJson(xerr)) : (200, XstsJson),
@@ -234,6 +232,26 @@ internal sealed class AuthStubServer : IDisposable
         var bytes = Encoding.UTF8.GetBytes(response.Item2);
         ctx.Response.ContentLength64 = bytes.Length;
         ctx.Response.OutputStream.Write(bytes);
+    }
+
+    private int _deviceCodeCalls;
+
+    private (int, string) DeviceCodeResponse()
+    {
+        if (++_deviceCodeCalls > DeviceCodeFailAfter)
+        {
+            return (500, "{}");
+        }
+
+        return (200, $$"""
+                        {
+                            "device_code": "DEV_CODE_STUB",
+                            "user_code": "FLINT-CODE",
+                            "verification_uri": "https://microsoft.com/link",
+                            "expires_in": {{DeviceCodeExpiresIn}},
+                            "interval": 1
+                        }
+                        """);
     }
 
     private (int, string) TokenResponse()

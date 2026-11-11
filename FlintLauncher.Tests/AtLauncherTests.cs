@@ -5,7 +5,7 @@
 // and the end-to-end pack install (Configs.json fetch -> Configs.zip download+extraction
 // with sha1 verification -> md5-verified mod downloads -> instance creation with the
 // net.minecraft/loader components, jar mods and the optional-mod selection honored) —
-// all against the stub ATL server. Each test drives its own AtLauncherApi client pointed
+// all against the stub ATL server. Each test drives its own AtLauncherClient pointed
 // at the stub (the former process-global DownloadServerUrl/ApiBaseUrl hooks are
 // per-instance state now).
 
@@ -14,6 +14,8 @@ using System.Text.Json.Nodes;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.ModPlatform.AtLauncher;
 using FlintLauncher.Core.Net;
+using FlintLauncher.ExternalApi;
+using FlintLauncher.ExternalApi.AtLauncher;
 using TruePath;
 using Xunit;
 
@@ -24,17 +26,17 @@ public class AtLauncherTests : IDisposable
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"flint-atl-{Guid.NewGuid():N}");
     private readonly TestGlobalSettings _global = new();
     private readonly StubAtlServer _server = new();
-    private readonly AtLauncherApi _api;
+    private readonly AtLauncherClient _api;
 
     public AtLauncherTests()
     {
         Directory.CreateDirectory(_root);
         // both URL hooks point at the stub (note the trailing slash like the C++ defaults)
-        _api = new AtLauncherApi(TestNet.Http)
+        _api = new AtLauncherClient(new AtLauncherClientOptions
         {
             DownloadServerUrl = _server.Url + "/",
             ApiBaseUrl = _server.Url + "/",
-        };
+        });
     }
 
     public void Dispose()
@@ -87,7 +89,7 @@ public class AtLauncherTests : IDisposable
     {
         fixture.Register(_server);
         var list = CreateList();
-        var task = new AtLauncherPackInstallTask(fixture.PackName, fixture.VersionName, api: _api)
+        var task = new AtLauncherPackInstallTask(fixture.PackName, fixture.VersionName, api: _api, http: TestNet.Http)
         {
             OptionalModsSelection = optionalSelection ?? new Dictionary<string, bool>
             {
@@ -138,9 +140,7 @@ public class AtLauncherTests : IDisposable
                 ["versions"] = new JsonArray(),
             }).ToJsonString();
 
-        var body = await _api.FetchPackIndexAsync();
-
-        var packs = AtLauncherApi.LoadPackIndex(body);
+        var packs = await _api.Packs.Index().SendTo(TestNet.Http);
 
         Assert.Equal(2, packs.Count);
         Assert.Equal(1, packs[0].Id);
@@ -180,12 +180,10 @@ public class AtLauncherTests : IDisposable
             },
         }.ToJsonString();
 
-        var body = await _api.FetchShareCodeAsync("goodcode");
+        var response = await _api.ShareCodes.ByCode("goodcode").SendTo(TestNet.Http);
 
-        var shareCode = AtLauncherApi.LoadShareCode(body, out var error);
-
-        Assert.Null(error);
-        Assert.NotNull(shareCode);
+        Assert.False(response.Error);
+        var shareCode = response.Data!;
         Assert.Equal("Test Pack", shareCode.Pack);
         Assert.Equal("1.0.0", shareCode.Version);
         Assert.Equal(2, shareCode.Mods.Count);
@@ -197,7 +195,7 @@ public class AtLauncherTests : IDisposable
     [Fact]
     public void ShareCode_ErrorResponse_ReportsMessage()
     {
-        var parsed = AtLauncherApi.LoadShareCode(
+        var parsed = AtLauncherJson.LoadShareCode(
             """{"error":true,"code":400,"message":"Unknown share code"}""", out var error);
 
         Assert.Null(parsed);
@@ -208,11 +206,11 @@ public class AtLauncherTests : IDisposable
     public void ShareCode_MessageMayBeNull()
     {
         // a null message must not throw (the C++ checks isNull before requireString)
-        var parsed = AtLauncherApi.LoadShareCode(
+        var parsed = AtLauncherJson.LoadShareCode(
             """{"error":true,"code":1,"message":null}""", out var error);
 
         Assert.Null(parsed);
-        Assert.Equal("", error);
+        Assert.Null(error);
     }
 
     // ------------------------------------------------------------------ install
@@ -303,7 +301,7 @@ public class AtLauncherTests : IDisposable
         fixture.Register(_server);
 
         var list = CreateList();
-        var task = new AtLauncherPackInstallTask(fixture.PackName, fixture.VersionName, api: _api);
+        var task = new AtLauncherPackInstallTask(fixture.PackName, fixture.VersionName, api: _api, http: TestNet.Http);
         task.SetName("ATL NoConfigs");
         var wrapped = list.WrapInstanceTask(task);
         await wrapped(TestContext.Current.CancellationToken);
@@ -323,7 +321,7 @@ public class AtLauncherTests : IDisposable
         fixture.Register(_server);
 
         var list = CreateList();
-        var task = new AtLauncherPackInstallTask(fixture.PackName, fixture.VersionName, api: _api);
+        var task = new AtLauncherPackInstallTask(fixture.PackName, fixture.VersionName, api: _api, http: TestNet.Http);
         task.SetName("ATL BadSha");
         var wrapped = list.WrapInstanceTask(task);
         await Assert.ThrowsAnyAsync<Exception>(() => wrapped(TestContext.Current.CancellationToken));
@@ -346,7 +344,7 @@ public class AtLauncherTests : IDisposable
         fixture.Register(_server);
 
         var list = CreateList();
-        var task = new AtLauncherPackInstallTask(fixture.PackName, fixture.VersionName, api: _api);
+        var task = new AtLauncherPackInstallTask(fixture.PackName, fixture.VersionName, api: _api, http: TestNet.Http);
         task.SetName("ATL BadMd5");
         var wrapped = list.WrapInstanceTask(task);
         await Assert.ThrowsAnyAsync<Exception>(() => wrapped(TestContext.Current.CancellationToken));
@@ -363,7 +361,7 @@ public class AtLauncherTests : IDisposable
         cache.AddBase("ATLauncherPacks", new AbsolutePath(cacheDir));
 
         var list = CreateList();
-        var task = new AtLauncherPackInstallTask(fixture.PackName, fixture.VersionName, api: _api)
+        var task = new AtLauncherPackInstallTask(fixture.PackName, fixture.VersionName, api: _api, http: TestNet.Http)
         {
             MetaCache = cache,
             OptionalModsSelection = new Dictionary<string, bool> { ["Optional Selected"] = true },
@@ -395,7 +393,7 @@ public class AtLauncherTests : IDisposable
         _server.ConfigsJson[$"{fixture.SafeName}/{fixture.VersionName}"] = """{"version":"1.0.0"}""";
 
         var list = CreateList();
-        var task = new AtLauncherPackInstallTask(fixture.PackName, fixture.VersionName, api: _api);
+        var task = new AtLauncherPackInstallTask(fixture.PackName, fixture.VersionName, api: _api, http: TestNet.Http);
         task.SetName("ATL BadJson");
         var wrapped = list.WrapInstanceTask(task);
         var ex = await Assert.ThrowsAnyAsync<Exception>(() => wrapped(TestContext.Current.CancellationToken));
@@ -438,7 +436,7 @@ public class AtLauncherTests : IDisposable
     {
         var fixture = AtlPackFixture.Create("""{"type":"fabric","choose":true,"metadata":{"loader":"","latest":false,"recommended":false}}""");
         var list = CreateList();
-        var task = new AtLauncherPackInstallTask(fixture.PackName, fixture.VersionName, api: _api)
+        var task = new AtLauncherPackInstallTask(fixture.PackName, fixture.VersionName, api: _api, http: TestNet.Http)
         {
             OptionalModsSelection = new Dictionary<string, bool>(),
             ChooseLoaderVersion = (uid, mcVersion) =>
@@ -474,7 +472,7 @@ public class AtLauncherTests : IDisposable
         fixture.Register(_server);
 
         var list = CreateList();
-        var task = new AtLauncherPackInstallTask(fixture.PackName, fixture.VersionName, api: _api);
+        var task = new AtLauncherPackInstallTask(fixture.PackName, fixture.VersionName, api: _api, http: TestNet.Http);
         task.SetName("ATL MainClass");
         var wrapped = list.WrapInstanceTask(task);
         await wrapped(TestContext.Current.CancellationToken);
@@ -498,7 +496,7 @@ public class AtLauncherTests : IDisposable
         fixture.Register(_server);
 
         var list = CreateList();
-        var task = new AtLauncherPackInstallTask(fixture.PackName, fixture.VersionName, api: _api);
+        var task = new AtLauncherPackInstallTask(fixture.PackName, fixture.VersionName, api: _api, http: TestNet.Http);
         task.SetName("ATL DepMissing");
         var wrapped = list.WrapInstanceTask(task);
         await wrapped(TestContext.Current.CancellationToken);
@@ -521,7 +519,7 @@ public class AtLauncherTests : IDisposable
 
         string? displayed = null;
         var list = CreateList();
-        var task = new AtLauncherPackInstallTask(fixture.PackName, fixture.VersionName, api: _api)
+        var task = new AtLauncherPackInstallTask(fixture.PackName, fixture.VersionName, api: _api, http: TestNet.Http)
         {
             DisplayMessage = message => displayed = message,
         };

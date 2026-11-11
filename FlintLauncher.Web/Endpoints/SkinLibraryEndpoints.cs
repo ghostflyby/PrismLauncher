@@ -19,6 +19,7 @@
 using System.Diagnostics.CodeAnalysis;
 using FlintLauncher.Core.Auth;
 using FlintLauncher.Core.Skins;
+using FlintLauncher.ExternalApi.Mojang;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.OpenApi;
 using TruePath;
@@ -144,7 +145,7 @@ public static class SkinLibraryEndpoints
             {
                 await upload.SendAsync();
             }
-            catch (Exception e)
+            catch (MojangApiException e)
             {
                 return ApiJson.Error("skin_upload_failed", e.Message, 400);
             }

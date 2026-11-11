@@ -421,7 +421,7 @@ public sealed record ProfilerCommandView(string Program, string[] Arguments);
 /// <summary>One packsnew.json index version (GET /modplatform/atlauncher/packs[/versions]).</summary>
 public sealed record AtLauncherPackVersionView(string Version, string Minecraft);
 
-/// <summary>One packsnew.json index pack, mapped through AtLauncherPackIndex.LoadIndexedPack
+/// <summary>One packsnew.json index pack, decoded through AtLauncherJson.LoadPackIndex
 /// (safeName is the normalized pack *image* name, "&lt;safe&gt;.png").</summary>
 public sealed record AtLauncherPackView(
     string Name,
@@ -460,7 +460,7 @@ public sealed record FtbPackArtView(string Url, string Type, int Width, int Heig
 /// <summary>One pack author (GET /modplatform/ftb/packs/{id}).</summary>
 public sealed record FtbPackAuthorView(string Name, string Type, string Website);
 
-/// <summary>The /modpack/{id} description mapped through FtbPackManifest.LoadModpack
+/// <summary>The /modpack/{id} description decoded through FtbJson.LoadModpack
 /// (safeName is the normalized pack *image* name, "&lt;safe&gt;.png"; tags are flattened to
 /// their names).</summary>
 public sealed record FtbPackView(
@@ -493,7 +493,7 @@ public sealed record FtbInstallRequest(
 
 // ----------------------------------------------------------------- Technic
 
-/// <summary>One search/trending hit mapped through TechnicApi.LoadSearchResults (id is the
+/// <summary>One search/trending hit mapped through TechnicPackIndex.LoadSearchResults (id is the
 /// slug; displayName is only set by the single-pack mode, where the API distinguishes the
 /// slug "name" from the "displayName"; iconUrl is null for the "null" logo placeholder).</summary>
 public sealed record TechnicSearchResultView(

@@ -2,7 +2,6 @@
 // SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
 
 using FlintLauncher.Core;
-using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Migration;
 using TruePath;
 

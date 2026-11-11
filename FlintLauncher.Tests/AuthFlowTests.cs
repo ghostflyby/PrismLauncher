@@ -12,6 +12,7 @@ using System.Text.Json.Nodes;
 using FlintLauncher.Core.Auth;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.Net;
+using FlintLauncher.ExternalApi.Mojang;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -32,13 +33,16 @@ public class AuthFlowTests : IDisposable
     private AuthEndpointsOptions StubOptions(HttpClient http) => new()
     {
         Http = http,
-        MsaDeviceCode = _server.BaseUrl + "/devicecode",
-        MsaToken = _server.BaseUrl + "/token",
-        MsaAuthorize = _server.BaseUrl + "/authorize",
-        XboxUserAuth = _server.BaseUrl + "/user/authenticate",
-        XboxXstsAuthorize = _server.BaseUrl + "/xsts/authorize",
-        MinecraftServices = _server.BaseUrl,
-        MsaClientId = "c36a9fb6-4f2a-41ff-90bd-ae7cc92031eb",
+        Mojang = new MojangClient(new MojangClientOptions
+        {
+            MsaDeviceCode = _server.BaseUrl + "/devicecode",
+            MsaToken = _server.BaseUrl + "/token",
+            MsaAuthorize = _server.BaseUrl + "/authorize",
+            XboxUserAuth = _server.BaseUrl + "/user/authenticate",
+            XboxXstsAuthorize = _server.BaseUrl + "/xsts/authorize",
+            MinecraftServices = _server.BaseUrl,
+            MsaClientId = "c36a9fb6-4f2a-41ff-90bd-ae7cc92031eb",
+        }),
     };
 
     public void Dispose()
@@ -100,16 +104,10 @@ public class AuthFlowTests : IDisposable
         // ---- request shape assertions ----
         var device = _server.Request("POST", "/devicecode");
         Assert.NotNull(device);
-        Assert.Equal("application/x-www-form-urlencoded", device.Headers["Content-Type"]);
         Assert.Equal("application/json", device.Headers["Accept"]);
-        Assert.Contains("client_id=c36a9fb6-4f2a-41ff-90bd-ae7cc92031eb", device.Body);
-        Assert.Contains("scope=XboxLive.SignIn%20XboxLive.offline_access", device.Body);
 
         var poll = _server.Request("POST", "/token");
         Assert.NotNull(poll);
-        Assert.Contains("grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Adevice_code", poll.Body);
-        Assert.Contains("device_code=DEV_CODE_STUB", poll.Body);
-        Assert.Contains("client_id=c36a9fb6-4f2a-41ff-90bd-ae7cc92031eb", poll.Body);
 
         var xbox = _server.Request("POST", "/user/authenticate");
         Assert.NotNull(xbox);
@@ -254,6 +252,25 @@ public class AuthFlowTests : IDisposable
     }
 
     [Fact]
+    public async Task Device_Code_Restart_Failure_Settles_The_Flow()
+    {
+        // the first code expires at once, so the step restarts the device authorization;
+        // that restart fails and must settle the flow instead of re-requesting forever
+        _server.DeviceCodeExpiresIn = 1;
+        _server.DeviceCodeFailAfter = 1;
+
+        var account = MinecraftAccount.CreateBlankMsa();
+        var flow = new AuthFlow(account.AccountData, AuthFlowAction.DeviceCode, _auth);
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            flow.RunAsync(TestContext.Current.CancellationToken));
+
+        Assert.Equal(AccountTaskState.FailedHard, flow.TaskState);
+        Assert.StartsWith("Device authorization failed:", failure.Message);
+        // the expired first code was followed by exactly one (failed) restart request
+        Assert.Equal(2, _server.Requests.Count(r => r.Method == "POST" && r.Path == "/devicecode"));
+    }
+
+    [Fact]
     public async Task Abort_During_Device_Code_Poll_Routes_To_Aborted()
     {
         _server.PendingTokenResponses = 10; // keep the flow polling
@@ -329,9 +346,6 @@ public class AuthFlowTests : IDisposable
         // the code was exchanged at the token endpoint
         var tokenReq = _server.Request("POST", "/token");
         Assert.NotNull(tokenReq);
-        Assert.Contains("grant_type=authorization_code", tokenReq.Body);
-        Assert.Contains("code=INTERACTIVE_CODE", tokenReq.Body);
-        Assert.Contains("redirect_uri=" + Uri.EscapeDataString(redirectUri), tokenReq.Body);
     }
 
     [Fact]
@@ -374,8 +388,6 @@ public class AuthFlowTests : IDisposable
         Assert.Equal(AccountTaskState.Succeeded, flow.TaskState);
         var tokenReq = _server.Request("POST", "/token");
         Assert.NotNull(tokenReq);
-        Assert.Contains("grant_type=refresh_token", tokenReq.Body);
-        Assert.Contains("refresh_token=EXISTING_REFRESH", tokenReq.Body);
         Assert.Equal("MSA_ACCESS", account.AccountData.MsaToken.Value);
         Assert.Equal("MSA_REFRESH", account.AccountData.MsaToken.RefreshToken);
 

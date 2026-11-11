@@ -188,7 +188,7 @@ public static class TechnicPackProcessor
         {
             // the Mojang-shaped version.json: a non-object root or wrong-kind structure
             // fails the deserialization into the same "Could not understand" message
-            var wire = JsonSerializer.Deserialize(data, TechnicJsonContext.Default.TechnicVersionJson)
+            var wire = JsonSerializer.Deserialize(data, TechnicPackJsonContext.Default.TechnicVersionJson)
                        ?? throw new JsonException("the document is null");
             var packMinecraftVersion = wire.InheritsFrom;
             if (packMinecraftVersion.Length == 0)
@@ -313,7 +313,7 @@ public static class TechnicPackProcessor
         public override TechnicArgumentsJson? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             return reader.TokenType == JsonTokenType.StartObject
-                ? JsonSerializer.Deserialize(ref reader, TechnicJsonContext.Default.TechnicArgumentsJson)
+                ? JsonSerializer.Deserialize(ref reader, TechnicPackJsonContext.Default.TechnicArgumentsJson)
                 : null;
         }
 
@@ -400,3 +400,10 @@ public static class TechnicPackProcessor
         return name;
     }
 }
+
+/// <summary>The source-generated context of the local pack documents the processor reads
+/// (bin/version.json).</summary>
+[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
+[JsonSerializable(typeof(TechnicPackProcessor.TechnicVersionJson))]
+[JsonSerializable(typeof(TechnicPackProcessor.TechnicArgumentsJson))]
+internal sealed partial class TechnicPackJsonContext : JsonSerializerContext;

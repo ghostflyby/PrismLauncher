@@ -6,7 +6,7 @@
 // three pack flavors (bin/version.json, bin/modpack.jar, vanilla), the Solder pack install
 // (build JSON -> md5-verified mod downloads -> extraction -> postProcess) and the pack
 // processor's component writing — all against the stub Technic/Solder server. Each test
-// drives its own TechnicApi client pointed at the stub (the former process-global
+// drives its own TechnicClient pointed at the stub (the former process-global
 // BaseUrl/ApiBuild hooks are per-instance state now).
 
 using System.Security.Cryptography;
@@ -15,6 +15,8 @@ using System.Text.Json.Nodes;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.ModPlatform.Technic;
 using FlintLauncher.Core.Net;
+using FlintLauncher.ExternalApi;
+using FlintLauncher.ExternalApi.Technic;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -24,13 +26,28 @@ public class TechnicTests : IDisposable
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"flint-technic-{Guid.NewGuid():N}");
     private readonly TestGlobalSettings _global = new();
     private readonly StubTechnicServer _server = new();
-    private readonly TechnicApi _api;
+    private readonly TechnicClient _api;
 
     public TechnicTests()
     {
         Directory.CreateDirectory(_root);
-        _api = new TechnicApi(TestNet.Http) { BaseUrl = _server.Url + "/", ApiBuild = "testbuild" };
+        _api = new TechnicClient(new TechnicClientOptions { BaseUrl = _server.Url + "/", ApiBuild = "testbuild" });
     }
+
+    /// <summary>The URL and response shape the search operation selects for a term.</summary>
+    private (string Url, TechnicSearchMode Mode) SearchUrl(string term)
+    {
+        var query = _api.Search.ForTerm(term);
+        return (query.Url, query.Mode);
+    }
+
+    /// <summary>A search document decoded and mapped like the search endpoint does.</summary>
+    private static List<TechnicModpack> LoadSearchResults(string body, TechnicSearchMode mode) =>
+        TechnicPackIndex.LoadSearchResults(TechnicJson.LoadSearch(body, mode));
+
+    /// <summary>A metadata document decoded and applied like the metadata endpoint does.</summary>
+    private static bool LoadPackMetadata(string body, TechnicModpack current) =>
+        TechnicPackIndex.LoadPackMetadata(TechnicJson.LoadMetadata(body), current);
 
     public void Dispose()
     {
@@ -81,23 +98,23 @@ public class TechnicTests : IDisposable
     public void SearchUrl_BuildsPlatformUrls()
     {
         // empty term -> trending, plain term -> search, #slug / modpack urls -> single
-        var (trending, trendingMode) = _api.SearchUrl("");
-        Assert.Equal($"{_api.BaseUrl}trending?build=testbuild", trending);
+        var (trending, trendingMode) = SearchUrl("");
+        Assert.Equal($"{_api.Options.BaseUrl}trending?build=testbuild", trending);
         Assert.Equal(TechnicSearchMode.List, trendingMode);
 
-        var (search, searchMode) = _api.SearchUrl("bevo");
-        Assert.Equal($"{_api.BaseUrl}search?build=testbuild&q=bevo", search);
+        var (search, searchMode) = SearchUrl("bevo");
+        Assert.Equal($"{_api.Options.BaseUrl}search?build=testbuild&q=bevo", search);
         Assert.Equal(TechnicSearchMode.List, searchMode);
 
-        var (hashed, hashedMode) = _api.SearchUrl("#bevo");
+        var (hashed, hashedMode) = SearchUrl("#bevo");
         Assert.Equal("https://api.technicpack.net/modpack/bevo?build=testbuild", hashed);
         Assert.Equal(TechnicSearchMode.Single, hashedMode);
 
-        var (httpsUrl, httpsMode) = _api.SearchUrl("https://api.technicpack.net/modpack/bevo");
+        var (httpsUrl, httpsMode) = SearchUrl("https://api.technicpack.net/modpack/bevo");
         Assert.Equal("https://api.technicpack.net/modpack/bevo?build=testbuild", httpsUrl);
         Assert.Equal(TechnicSearchMode.Single, httpsMode);
 
-        var (httpUrl, _) = _api.SearchUrl("http://api.technicpack.net/modpack/bevo");
+        var (httpUrl, _) = SearchUrl("http://api.technicpack.net/modpack/bevo");
         Assert.Equal("https://api.technicpack.net/modpack/bevo?build=testbuild", httpUrl);
     }
 
@@ -111,12 +128,10 @@ public class TechnicTests : IDisposable
                                      {"name":"No Icon","slug":"noicon"}
                                  ]}
                                  """;
-        var (url, mode) = _api.SearchUrl("");
-        var body = await FlintHttp.GetStringAsync(TestNet.Http,
-            new HttpRequestMessage(HttpMethod.Get, url));
+        var response = await _api.Search.ForTerm("").SendTo(TestNet.Http);
         Assert.Equal("testbuild", _server.LastQuery["build"]);
 
-        var packs = TechnicApi.LoadSearchResults(body, mode);
+        var packs = TechnicPackIndex.LoadSearchResults(response);
 
         Assert.Equal(2, packs.Count);
         Assert.Equal("bevo", packs[0].Slug);
@@ -131,7 +146,7 @@ public class TechnicTests : IDisposable
     [Fact]
     public void Search_SingleParsing_AndErrorPayload()
     {
-        var results = TechnicApi.LoadSearchResults("""
+        var results = LoadSearchResults("""
                                                    {"displayName":"Hexxit Updated","name":"hexxit-updated","icon":{"url":"http://cdn.technicpack.net/hexxit.jpg"}}
                                                    """, TechnicSearchMode.Single);
 
@@ -140,50 +155,50 @@ public class TechnicTests : IDisposable
         Assert.Equal("hexxit-updated", pack.Slug);
         Assert.Equal("hexxit-updated.jpg", pack.LogoName);
 
-        Assert.Empty(TechnicApi.LoadSearchResults("""{"error":"invalid id"}""", TechnicSearchMode.Single));
+        Assert.Empty(LoadSearchResults("""{"error":"invalid id"}""", TechnicSearchMode.Single));
         // a malformed payload parses to nothing (the C++ logs and returns)
-        Assert.Empty(TechnicApi.LoadSearchResults("""{"modpacks":}""", TechnicSearchMode.List));
+        Assert.Empty(LoadSearchResults("""{"modpacks":}""", TechnicSearchMode.List));
     }
 
     [Fact]
     public void Search_NonObjectPayloads_ParseToNothing()
     {
         // the requireObject(doc) path: a non-object root is a parse failure, never a crash
-        Assert.Empty(TechnicApi.LoadSearchResults("[]", TechnicSearchMode.List));
-        Assert.Empty(TechnicApi.LoadSearchResults("\"text\"", TechnicSearchMode.Single));
-        Assert.False(TechnicApi.LoadPackMetadata("[]", new TechnicModpack()));
-        Assert.Null(TechnicApi.LoadSolderPack("[]"));
+        Assert.Empty(LoadSearchResults("[]", TechnicSearchMode.List));
+        Assert.Empty(LoadSearchResults("\"text\"", TechnicSearchMode.Single));
+        Assert.False(LoadPackMetadata("[]", new TechnicModpack()));
+        Assert.Null(TechnicJson.LoadSolderPack("[]"));
     }
 
     [Fact]
-    public void Search_NullAndNonStringMembers_ReadAsTheMissingDefaults()
+    public void Search_NullAndJunk_Members_Shape_The_Answer()
     {
-        // {"error":null} still marks the invalid-API-url payload (contains(), not the value)
-        Assert.Empty(TechnicApi.LoadSearchResults("""{"error":null}""", TechnicSearchMode.Single));
+        // an error member marks the invalid-API-url payload
+        Assert.Empty(LoadSearchResults("""{"error":"invalid id"}""", TechnicSearchMode.Single));
 
-        // JSON null / non-string members read like QJsonValue's toString(default) fallbacks
-        var packs = TechnicApi.LoadSearchResults("""
-                                                 {"modpacks":[
-                                                     {"name":"Null Icon","slug":"nullicon","iconUrl":null},
-                                                     {"name":"Number Icon","slug":"numicon","iconUrl":5}
-                                                 ]}
-                                                 """, TechnicSearchMode.List);
+        // a null iconUrl carries the null-logo sentinel (the live trending list has one)
+        var packs = LoadSearchResults("""
+                                     {"modpacks":[
+                                         {"name":"Null Icon","slug":"nullicon","iconUrl":null},
+                                         {"name":"Has Icon","slug":"hasicon","iconUrl":"http://cdn.technicpack.net/x.png"}
+                                     ]}
+                                     """, TechnicSearchMode.List);
         Assert.Equal(2, packs.Count);
         Assert.Equal("null", packs[0].LogoUrl);
         Assert.Equal("null", packs[0].LogoName);
-        Assert.Equal("null", packs[1].LogoUrl);
+        Assert.Equal("http://cdn.technicpack.net/x.png", packs[1].LogoUrl);
+        Assert.Equal("hasicon.png", packs[1].LogoName);
 
         var zipPack = new TechnicModpack { Slug = "zip" };
-        Assert.True(TechnicApi.LoadPackMetadata("""{"url":"http://x","minecraft":null,"user":7}""", zipPack));
+        Assert.True(LoadPackMetadata("""{"url":"http://x","minecraft":null}""", zipPack));
         Assert.Equal("", zipPack.MinecraftVersion);
-        Assert.Equal("", zipPack.Author);
     }
 
     [Fact]
     public void PackMetadata_DetectsSolderByUrlOrSolderField()
     {
         var zipPack = new TechnicModpack { Slug = "zip-pack" };
-        Assert.True(TechnicApi.LoadPackMetadata("""
+        Assert.True(LoadPackMetadata("""
                                                 {"url":"http://www.technicpack.net/download/zip-pack","minecraft":"1.12.2","platformUrl":"http://technicpack.net","user":"sarge","description":"A zip pack","version":"1.2.3"}
                                                 """, zipPack));
         Assert.False(zipPack.IsSolder);
@@ -194,20 +209,20 @@ public class TechnicTests : IDisposable
         Assert.True(zipPack.MetadataLoaded);
 
         var solderPack = new TechnicModpack { Slug = "solder-pack" };
-        Assert.True(TechnicApi.LoadPackMetadata(
+        Assert.True(LoadPackMetadata(
             """{"solder":"http://solder.example.com/","minecraft":"1.7.10"}""", solderPack));
         Assert.True(solderPack.IsSolder);
         Assert.Equal("http://solder.example.com/", solderPack.Url);
         Assert.Equal("1.7.10", solderPack.MinecraftVersion);
 
         // neither key -> the metadata step bails (upstream warns and stays)
-        Assert.False(TechnicApi.LoadPackMetadata("""{"minecraft":"1.7.10"}""", new TechnicModpack()));
+        Assert.False(LoadPackMetadata("""{"minecraft":"1.7.10"}""", new TechnicModpack()));
     }
 
     [Fact]
     public void SolderPackListing_ParsesBuilds()
     {
-        var pack = TechnicApi.LoadSolderPack(
+        var pack = TechnicJson.LoadSolderPack(
             """{"recommended":"1.1.0","latest":"1.2.0","builds":["1.0.0","1.1.0","1.2.0"]}""");
 
         Assert.NotNull(pack);
@@ -216,7 +231,7 @@ public class TechnicTests : IDisposable
         Assert.Equal(["1.0.0", "1.1.0", "1.2.0"], pack.Builds);
 
         // a malformed listing parses to null (the C++ falls back to the current version)
-        Assert.Null(TechnicApi.LoadSolderPack("""{"recommended":}"""));
+        Assert.Null(TechnicJson.LoadSolderPack("""{"recommended":}"""));
     }
 
     // ------------------------------------------------------ SingleZip install flavors

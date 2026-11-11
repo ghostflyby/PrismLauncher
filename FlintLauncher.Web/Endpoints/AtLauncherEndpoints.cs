@@ -2,17 +2,17 @@
 // SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
 //
 // ATLauncher endpoints: the packsnew.json pass-through (the pack list and the
-// per-pack version list, both mapped through AtLauncherPackIndex.LoadIndexedPack like the
+// per-pack version list, both mapped through AtLauncherJson.LoadPackIndex like the
 // C++ AtlListModel) and the pack install — AtLauncherPackInstallTask run through the same
 // staged-commit flow as POST /instances/vanilla (the ATL configs/mods downloads are small,
 // so the flow is synchronous: 201 with the committed instance, 500 creation_failed with the
 // failure reason otherwise, e.g. a Configs.json 404 for an unknown pack/version).
 //
-// The ATL download-server/API URL hooks (AtLauncherApi.DownloadServerUrl / ApiBaseUrl) are
-// per-host state (AtLauncherApi — the headless equivalent of the C++ BuildConfig
-// constants). The install's `serverUrl` body field selects a per-request derived client
-// instead of mutating the shared one, so an override can never leak into other requests
-// (and needs no restore).
+// The ATL download-server/API URL hooks (AtLauncherClientOptions.DownloadServerUrl /
+// ApiBaseUrl) are per-host state (AtLauncherClient — the headless equivalent of the C++
+// BuildConfig constants). The install's `serverUrl` body field selects a per-request derived
+// client instead of mutating the shared one, so an override can never leak into other
+// requests (and needs no restore).
 
 using System.Text.Json;
 using FlintLauncher.Core.Instances;
@@ -20,6 +20,7 @@ using FlintLauncher.Core.IO;
 using FlintLauncher.Core.ModPlatform.AtLauncher;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Tasks;
+using FlintLauncher.ExternalApi.AtLauncher;
 using FlintLauncher.Web.Models;
 using FlintLauncher.Web.Services;
 using TruePath;
@@ -33,16 +34,16 @@ public static class AtLauncherEndpoints
         api.WithTags("ModPlatform");
         // ------------------------------------------------ modplatform/atlauncher/packs
         // the packsnew.json pass-through (AtlListModel::loadIndexedPack's mapping)
-        api.MapGet("/modplatform/atlauncher/packs", (AtLauncherApi atlauncher) => WithIndexAsync(
-                atlauncher, packs => Results.Ok(packs.Select(PackView).ToArray())))
+        api.MapGet("/modplatform/atlauncher/packs", (AtLauncherClient atlauncher, HttpClient http) =>
+                WithIndexAsync(atlauncher, http, packs => Results.Ok(packs.Select(PackView).ToArray())))
             .Produces<AtLauncherPackView[]>();
 
         // ---------------------------------------- modplatform/atlauncher/packs/{name}/versions
         // the index carries each pack's version list (the ATL CDN has no per-pack index URL,
         // so this re-reads packsnew.json and matches the pack by name, case-insensitively)
         api.MapGet("/modplatform/atlauncher/packs/{name}/versions", (string name,
-                AtLauncherApi atlauncher) => WithIndexAsync(
-                atlauncher,
+                AtLauncherClient atlauncher, HttpClient http) => WithIndexAsync(
+                atlauncher, http,
                 packs =>
                 {
                     var pack = packs.FirstOrDefault(candidate =>
@@ -57,8 +58,8 @@ public static class AtLauncherEndpoints
 
         // ------------------------------------------------ modplatform/atlauncher/install
         api.MapPost("/modplatform/atlauncher/install", async Task<IResult> (
-            AtLauncherInstallRequest request, AtLauncherApi atlauncherApi, InstanceList instances,
-            InstanceMutationLock instanceLock) =>
+            AtLauncherInstallRequest request, AtLauncherClient atlauncherApi, HttpClient http,
+            InstanceList instances, InstanceMutationLock instanceLock) =>
         {
             if (string.IsNullOrWhiteSpace(request.Name) || string.IsNullOrWhiteSpace(request.Version))
             {
@@ -76,7 +77,8 @@ public static class AtLauncherEndpoints
             await instanceLock.WaitAsync();
             try
             {
-                var task = new AtLauncherPackInstallTask(request.Name, request.Version, api: atlauncher)
+                var task = new AtLauncherPackInstallTask(request.Name, request.Version, api: atlauncher,
+                    http: http)
                 {
                     TargetDir = default,
                     Group = request.Group ?? "",
@@ -131,9 +133,9 @@ public static class AtLauncherEndpoints
     // ----------------------------------------------------------------- helpers
 
     /// <summary>The request's ATLauncher client: the shared one, or — with a `serverUrl`
-    /// override — a derived client (same net stack), leaving the shared instance untouched.
-    /// Returns the error result for a malformed override.</summary>
-    private static AtLauncherApi ResolveApi(AtLauncherApi atlauncher, string? serverUrl, out IResult? error)
+    /// override — a derived client, leaving the shared instance untouched. Returns the error
+    /// result for a malformed override.</summary>
+    private static AtLauncherClient ResolveApi(AtLauncherClient atlauncher, string? serverUrl, out IResult? error)
     {
         error = null;
         if (string.IsNullOrWhiteSpace(serverUrl))
@@ -151,39 +153,33 @@ public static class AtLauncherEndpoints
         }
 
         // the URL builders concatenate directly onto the base, so keep the slash
-        return new AtLauncherApi(atlauncher.Http)
+        return new AtLauncherClient(new AtLauncherClientOptions
         {
             DownloadServerUrl = trimmed.EndsWith('/') ? trimmed : trimmed + "/",
             // (ApiBaseUrl is only read by the share-code flow, never by the install)
-        };
+        });
     }
 
     /// <summary>Fetch + parse packsnew.json (the shared logic of the two GET endpoints) and
     /// hand the packs to <paramref name="map"/>; fetch/parse failures map to the uniform
     /// 502 error envelope instead.</summary>
-    private static async Task<IResult> WithIndexAsync(AtLauncherApi atlauncher,
+    private static async Task<IResult> WithIndexAsync(AtLauncherClient atlauncher, HttpClient http,
         Func<List<IndexedPack>, IResult> map)
     {
-        string body;
-        try
-        {
-            body = await atlauncher.FetchPackIndexAsync();
-        }
-        catch (FlintHttpException e)
-        {
-            return ApiJson.Error("atlauncher_unavailable",
-                $"atlauncher pack index failed: {e.Reason}", 502);
-        }
-
         List<IndexedPack> packs;
         try
         {
-            packs = AtLauncherApi.LoadPackIndex(body);
+            packs = await atlauncher.Packs.Index().FetchAsync(http);
         }
-        catch (JsonException e)
+        catch (AtLauncherApiException e) when (e.InnerException is JsonException)
         {
             return ApiJson.Error("atlauncher_invalid_response",
                 $"atlauncher pack index is invalid: {e.Message}", 502);
+        }
+        catch (AtLauncherApiException e)
+        {
+            return ApiJson.Error("atlauncher_unavailable",
+                $"atlauncher pack index failed: {e.Message}", 502);
         }
 
         return map(packs);
@@ -194,7 +190,7 @@ public static class AtLauncherEndpoints
     private static AtLauncherPackView PackView(IndexedPack pack) => new(
         pack.Name,
         pack.SafeName,
-        pack.Description,
+        pack.Description ?? "",
         pack.Type == PackType.Private ? "private" : "public",
         pack.Versions.Select(version => new AtLauncherPackVersionView(version.Version, version.Minecraft))
             .ToList());
