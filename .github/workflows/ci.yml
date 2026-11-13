@@ -34,7 +34,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: 10.0.x
+          global-json-file: global.json
           cache: true
           cache-dependency-path: '**/*.csproj'
 
@@ -65,7 +65,7 @@ jobs:
         # longer exists. --report-trx (provided by
         # Microsoft.Testing.Extensions.TrxReport, referenced by the test
         # project) writes the .trx into TestResults.
-        run: dotnet test FlintLauncher.slnx --no-build --configuration Release --report-trx --results-directory TestResults
+        run: dotnet test --solution FlintLauncher.slnx --no-build --configuration Release --report-trx --results-directory TestResults
 
       - name: Upload test results
         uses: actions/upload-artifact@v7
