@@ -52,7 +52,7 @@
     <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.14"/>
     <!-- JVM enumeration (Apache-2.0, GPL-3.0-compatible): the provider suite backs the
          first discovery layer in JavaUtils.FindJavaPaths. -->
-    <PackageReference Include="JdkFind" Version="0.7.0"/>
+    <PackageReference Include="JdkFind" Version="0.8.0"/>
     <!-- TOML parsing (BSD-2-Clause, GPL-3.0-compatible, AOT-safe): typed source-generated
          DTOs replace the hand-rolled packwiz subset parser. -->
     <PackageReference Include="Tomlyn" Version="2.10.2"/>
