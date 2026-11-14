@@ -49,7 +49,7 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.14"/>
     <!-- The Options read face of the typed user layer (IOptionsMonitor over the flint.json
          store). No configuration binder is involved: the store hands its record through. -->
-    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.14"/>
+    <PackageReference Include="Microsoft.Extensions.Options" Version="11.0.0"/>
     <!-- JVM enumeration (Apache-2.0, GPL-3.0-compatible): the provider suite backs the
          first discovery layer in JavaUtils.FindJavaPaths. -->
     <PackageReference Include="JdkFind" Version="0.7.0"/>
