@@ -1,9 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
-//
-// Tests for the Java::Metadata and JavaExecutable comparators and the metadata parser. The C++
-// tests directory only carries JavaVersion_test.cpp (no JavaMetadata/JavaInstall comparator
-// tests), so these are table checks written against the upstream operator semantics.
 
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Java;

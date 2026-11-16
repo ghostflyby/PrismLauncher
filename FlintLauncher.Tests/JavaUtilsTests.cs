@@ -1,10 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
-//
-// Tests for the JVM discovery (macOS-first, matching the host machine), the process environment
-// cleaner. Discovery runs on JdkFind's executable-oriented locate plus the launcher-owned
-// providers; the synthetic providers are the test seam, and real-machine assertions are guarded
-// like RealDataSmokeTests.
 
 using FlintLauncher.Core;
 using FlintLauncher.Core.Java;

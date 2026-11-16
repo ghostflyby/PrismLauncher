@@ -19,20 +19,6 @@
 //     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //     See the License for the specific language governing permissions and
 //     limitations under the License.
-//
-// Port of launcher/java/JavaInstallList.{h,cpp}: a sorted list of discovered Java
-// executables plus the JavaListLoadTask that fills it. Detection lives in JavaDetection
-// (JdkFind LocateExecutables), so the list holds JdkFind's JavaExecutable directly.
-//
-// Deviations from the C++ original:
-//  - The BaseVersionList/QAbstractListModel surface (data() roles, VersionPointerRole, ...)
-//    is UI plumbing and is not ported. RecommendedRole upstream is a constant `false` in this
-//    revision (m_current_recommended is initialised to NULL and never assigned), so there is
-//    no recommendation logic to port; consumers that need a default pick the newest entry.
-//  - Detection no longer runs JavaCheck.jar per candidate (see JavaDetection); the list
-//    metadata comes from the release file + runtime probe instead of the checker output.
-//  - The APPLICATION->settings()->get("NumberOfConcurrentTasks") lookup died with the
-//    JavaCheck fan-out: the JdkFind pipeline manages its own parallelism.
 
 using System.Collections;
 using JdkFind;

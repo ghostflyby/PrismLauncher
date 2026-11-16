@@ -18,10 +18,6 @@
 //     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //     See the License for the specific language governing permissions and
 //     limitations under the License.
-//
-// Port of launcher/java/JavaUtils.{h,cpp}: the executable-name and architecture helpers
-// plus the process-environment cleaner. JVM discovery lives in JavaDetection, backed by the
-// JdkFind provider suite and the launcher-owned providers in JavaProviders.
 
 namespace FlintLauncher.Core.Java;
 

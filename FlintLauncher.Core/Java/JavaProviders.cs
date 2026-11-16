@@ -1,10 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
-//
-// The launcher-owned JVM providers for the JdkFind provider suite. Everything the
-// system-wide suite already models stays there; these cover only the sources JdkFind
-// cannot know about: the launcher-managed java root and the official launcher's
-// runtime bundles.
 
 using JdkFind;
 using TruePath;
@@ -31,6 +26,60 @@ internal sealed class ManagedJavaRootJvmProvider(AbsolutePath? root) : IJvmProvi
             {
                 yield return home;
             }
+        }
+    }
+}
+
+/// <summary>Exposes the installations named by FLINT_JAVA_PATHS. The upstream contract
+/// names executable paths; each entry is mapped to the validated home above it so the
+/// result can ride the provider suite. A path outside a recognizable home is ignored.</summary>
+internal sealed class JavaPathsJvmProvider : IJvmProvider
+{
+    public string Name => "flint-java-paths";
+
+    public IEnumerable<string> GetJavaHomes()
+    {
+        var value = Environment.GetEnvironmentVariable($"{FlintConfig.Default.LauncherAppBinaryEnvName}_JAVA_PATHS") ?? "";
+        var paths = value.Split(OperatingSystem.IsWindows() ? ';' : ':',
+            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var seen = new HashSet<string>(
+            OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
+                ? StringComparer.OrdinalIgnoreCase
+                : StringComparer.Ordinal);
+        foreach (var path in paths)
+        {
+            foreach (var home in HomesFor(path))
+            {
+                if (seen.Add(home))
+                {
+                    yield return home;
+                }
+            }
+        }
+    }
+
+    private static IEnumerable<string> HomesFor(string path)
+    {
+        string? directory = Directory.Exists(path)
+            ? Path.GetFullPath(path)
+            : File.Exists(path)
+                ? Path.GetDirectoryName(Path.GetFullPath(path))
+                : null;
+        if (directory is null)
+        {
+            yield break;
+        }
+
+        if (JavaHomeLayout.Probe(directory) is { } home)
+        {
+            yield return home;
+        }
+
+        if (Path.GetFileName(directory).Equals("bin", StringComparison.OrdinalIgnoreCase) &&
+            Path.GetDirectoryName(directory) is { } parent &&
+            JavaHomeLayout.Probe(parent) is { } parentHome)
+        {
+            yield return parentHome;
         }
     }
 }

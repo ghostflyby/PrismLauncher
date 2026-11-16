@@ -1,10 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
-//
-// Reads both the pre-JdkFind probe-cache shape (signature + five scalar fields) and the
-// current { signature, executable, languageVersion } shape, so launcher-state.json from an
-// older build keeps working. The legacy shape has no executable path; the dictionary key
-// remains the path, and the cached language version is preserved.
 
 using System.Text.Json;
 using System.Text.Json.Serialization;
