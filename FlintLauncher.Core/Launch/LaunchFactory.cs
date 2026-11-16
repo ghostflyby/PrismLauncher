@@ -4,7 +4,6 @@
 using FlintLauncher.Core.Auth;
 using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
-using FlintLauncher.Core.Java;
 using FlintLauncher.Core.Launch.Steps;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Settings;
