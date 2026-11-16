@@ -147,6 +147,20 @@ public class LauncherStateStoreTests : IDisposable
         Assert.Equal(17, entry.LanguageVersion);
     }
 
+    [Theory]
+    [InlineData("{\"stateVersion\":1,\"java\":{\"detections\":{\"/x\":5}}}")]
+    [InlineData("{\"stateVersion\":1,\"java\":{\"detections\":{\"/x\":{\"signature\":\"s\",\"version\":\"17.0.2\",\"languageVersion\":17.5}}}}")]
+    public void Malformed_JavaDetectEntry_Falls_Back_To_Default(string payload)
+    {
+        Directory.CreateDirectory(_dir);
+        File.WriteAllText(StateFile, payload);
+
+        var store = Store();
+
+        Assert.Empty(store.Current.Java.Detections);
+        Assert.True(File.Exists(StateFile + ".corrupt"));
+    }
+
     private static LauncherState PutDetection(LauncherState state, string path, string signature, string version, int? languageVersion) =>
         state with
         {

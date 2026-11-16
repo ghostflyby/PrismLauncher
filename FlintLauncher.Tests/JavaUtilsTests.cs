@@ -10,6 +10,7 @@ using FlintLauncher.Core;
 using FlintLauncher.Core.Java;
 using JdkFind;
 using JdkFind.Providers;
+using TruePath;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -47,6 +48,22 @@ public class JavaUtilsTests : IDisposable
     {
         _savedEnv.Add((name, Environment.GetEnvironmentVariable(name)));
         Environment.SetEnvironmentVariable(name, value);
+    }
+
+    /// <summary>A java binary that answers JdkFind's property probe with a complete trio,
+    /// so the executable is valid without a release file.</summary>
+    private static async Task WriteRunnableJavaAsync(string path, string version, string architecture)
+    {
+        await File.WriteAllTextAsync(path, $"""
+                                           #!/bin/sh
+                                           printf '%s\n' "    java.version = {version}" "    java.vendor = Test" "    os.arch = {architecture}" >&2
+                                           exit 0
+                                           """);
+        if (!OperatingSystem.IsWindows())
+        {
+            File.SetUnixFileMode(path, File.GetUnixFileMode(path) | UnixFileMode.UserExecute |
+                                       UnixFileMode.GroupExecute | UnixFileMode.OtherExecute);
+        }
     }
 
     // ------------------------------------------------------------------ discovery
@@ -128,8 +145,8 @@ public class JavaUtilsTests : IDisposable
         var candidates = await JavaDetection.DetectAsync(
             providers: [new MacOsJvmProvider([root]), new JavaHomeJvmProvider(root)]);
 
-        // the legacy/launcher fallback contributes its own (real-machine) candidates, so
-        // scope the assertion to the synthetic home
+        // the system suite contributes its own (real-machine) candidates, so scope the
+        // assertion to the synthetic home
         var candidate = Assert.Single(candidates,
             c => c.Path == Path.Combine(home, "bin", JavaUtils.JavaExecutable));
         Assert.Equal("aarch64", candidate.Architecture);
@@ -148,8 +165,7 @@ public class JavaUtilsTests : IDisposable
         var root = TempRoot();
         var home = Path.Combine(root, "jdk-21.0.5");
         Directory.CreateDirectory(Path.Combine(home, "bin"));
-        await File.WriteAllTextAsync(Path.Combine(home, "bin",
-            OperatingSystem.IsWindows() ? "java.exe" : "java"), "");
+        await WriteRunnableJavaAsync(Path.Combine(home, "bin", "java"), "21.0.5", "x86_64");
         await File.WriteAllTextAsync(Path.Combine(home, "release"), "JAVA_VERSION=\"21.0.5\"\nOS_ARCH=\"x86_64\"\n");
 
         IJvmProvider provider = OperatingSystem.IsWindows()
@@ -166,6 +182,57 @@ public class JavaUtilsTests : IDisposable
         Assert.Equal(21, install.Installation?.LanguageVersion);
         Assert.Equal("x86_64", install.Architecture);
         Assert.True(JavaUtils.Is64BitArchitecture(install.Architecture));
+        Assert.Null(install.StartFailure);
+    }
+
+    [Fact]
+    public async Task JavaListLoadTask_ExcludesFailedProbe()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return; // the fixture names the binary with the unix "java" spelling
+        }
+
+        var root = TempRoot();
+        var home = Path.Combine(root, "jdk-broken");
+        Directory.CreateDirectory(Path.Combine(home, "bin"));
+        await File.WriteAllTextAsync(Path.Combine(home, "bin", "java"), "");
+        await File.WriteAllTextAsync(Path.Combine(home, "release"), "JAVA_VERSION=\"11.0.1\"\n");
+
+        IJvmProvider provider = OperatingSystem.IsMacOS()
+            ? new MacOsJvmProvider([root])
+            : new UnixJvmProvider(root);
+        var list = new JavaInstallList();
+        await JavaListLoadTask.RunAsync(list, TestContext.Current.CancellationToken, providers: [provider]);
+
+        Assert.Empty(list.Versions);
+    }
+
+    [Fact]
+    public async Task JavaListLoadTask_ManagedOnly_FindsReleaseLessExecutable()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return; // the fixture names the binary with the unix "java" spelling
+        }
+
+        // no release file: the home provider rejects it, and the executable-directory
+        // layer must identify it through the probe alone
+        var root = TempRoot();
+        var home = Path.Combine(root, "jdk-no-release");
+        Directory.CreateDirectory(Path.Combine(home, "bin"));
+        await WriteRunnableJavaAsync(Path.Combine(home, "bin", "java"), "21.0.5", "aarch64");
+
+        var javaRoot = new AbsolutePath(root);
+        var list = new JavaInstallList(onlyManagedVersions: true, javaRoot: javaRoot);
+        await JavaListLoadTask.RunAsync(list, TestContext.Current.CancellationToken,
+            onlyManagedVersions: true, javaRoot: javaRoot);
+
+        var install = Assert.Single(list.Versions);
+        Assert.Equal("21.0.5", install.Version.Original);
+        Assert.Equal("aarch64", install.Architecture);
+        Assert.Null(install.Home);
+        Assert.Null(install.StartFailure);
     }
 
     [Fact]

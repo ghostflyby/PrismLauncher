@@ -37,7 +37,13 @@ public static class JavaDetection
         var results = new List<JavaExecutable>(located);
         if (!managedOnly)
         {
-            results.AddRange(await ProbeEnvironmentPathsAsync(cancellationToken).ConfigureAwait(false));
+            var seen = new HashSet<string>(PathComparer);
+            foreach (var executable in located)
+            {
+                seen.Add(CanonicalExecutablePath(executable.Path));
+            }
+
+            results.AddRange(await ProbeEnvironmentPathsAsync(seen, cancellationToken).ConfigureAwait(false));
         }
 
         return Deduplicate(results);
@@ -88,54 +94,84 @@ public static class JavaDetection
     /// executable. These are executable references, not homes, so they cannot ride the
     /// provider suite.</summary>
     private static async Task<IReadOnlyList<JavaExecutable>> ProbeEnvironmentPathsAsync(
-        CancellationToken cancellationToken)
+        HashSet<string> seen, CancellationToken cancellationToken)
     {
         var value = Environment.GetEnvironmentVariable($"{FlintConfig.Default.LauncherAppBinaryEnvName}_JAVA_PATHS") ?? "";
         var paths = value.Split(OperatingSystem.IsWindows() ? ';' : ':',
             StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        if (paths.Length == 0)
+
+        // Resolve and deduplicate before probing: an env entry that repeats an already
+        // located executable must not launch another probe.
+        var environmentSeen = new HashSet<string>(PathComparer);
+        var candidates = new List<string>(paths.Length);
+        foreach (var path in paths)
+        {
+            var executable = Directory.Exists(path) ? Path.Combine(path, JavaUtils.JavaExecutable) : path;
+            if (!File.Exists(executable))
+            {
+                continue;
+            }
+
+            var canonical = CanonicalExecutablePath(executable);
+            if (seen.Contains(canonical) || !environmentSeen.Add(canonical))
+            {
+                continue;
+            }
+
+            candidates.Add(executable);
+        }
+
+        if (candidates.Count == 0)
         {
             return [];
         }
 
-        var probed = new JavaExecutable?[paths.Length];
+        var probed = new JavaExecutable?[candidates.Count];
         await Parallel.ForEachAsync(
-                Enumerable.Range(0, paths.Length),
+                Enumerable.Range(0, candidates.Count),
                 new ParallelOptions
                 {
                     MaxDegreeOfParallelism = Environment.ProcessorCount,
                     CancellationToken = cancellationToken,
                 },
-                async (index, token) => probed[index] = await ProbePathAsync(paths[index], token)
-                    .ConfigureAwait(false))
+                async (index, token) => probed[index] =
+                    await JdkFinder.Default.FromExecutableAsync(candidates[index], token).ConfigureAwait(false))
             .ConfigureAwait(false);
 
         return probed.OfType<JavaExecutable>().ToList();
     }
 
-    private static async Task<JavaExecutable?> ProbePathAsync(string path, CancellationToken cancellationToken)
-    {
-        var executable = Directory.Exists(path) ? Path.Combine(path, JavaUtils.JavaExecutable) : path;
-        return File.Exists(executable)
-            ? await JdkFinder.Default.FromExecutableAsync(executable, cancellationToken).ConfigureAwait(false)
-            : null;
-    }
-
     private static IReadOnlyList<JavaExecutable> Deduplicate(IReadOnlyList<JavaExecutable> executables)
     {
-        var seen = new HashSet<string>(
-            OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
-                ? StringComparer.OrdinalIgnoreCase
-                : StringComparer.Ordinal);
+        var seen = new HashSet<string>(PathComparer);
         var results = new List<JavaExecutable>(executables.Count);
         foreach (var executable in executables)
         {
-            if (seen.Add(Path.GetFullPath(executable.Path)))
+            if (seen.Add(CanonicalExecutablePath(executable.Path)))
             {
                 results.Add(executable);
             }
         }
 
         return results;
+    }
+
+    private static StringComparer PathComparer =>
+        OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
+            ? StringComparer.OrdinalIgnoreCase
+            : StringComparer.Ordinal;
+
+    /// <summary>Resolves the executable's symlink chain, falling back to the full path when
+    /// the target cannot be read.</summary>
+    private static string CanonicalExecutablePath(string path)
+    {
+        try
+        {
+            return Path.GetFullPath(File.ResolveLinkTarget(path, returnFinalTarget: true)?.FullName ?? path);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return Path.GetFullPath(path);
+        }
     }
 }

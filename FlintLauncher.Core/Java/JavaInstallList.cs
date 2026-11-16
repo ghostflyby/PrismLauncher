@@ -56,8 +56,8 @@ public sealed class JavaInstallList : IReadOnlyList<JavaExecutable>
     private List<JavaExecutable> _vlist = [];
 
     /// <summary><paramref name="javaRoot"/> is the launcher-managed java dir (the JavaDir
-    /// setting under store semantics — the host passes the resolved root; the default
-    /// keeps the C++ cwd-relative behavior for bare fixtures).</summary>
+    /// setting under store semantics — the host passes the resolved root; null means there is
+    /// no launcher-managed root to scan).</summary>
     public JavaInstallList(bool onlyManagedVersions = false, AbsolutePath? javaRoot = null)
     {
         _onlyManagedVersions = onlyManagedVersions;
@@ -113,8 +113,9 @@ public sealed class JavaInstallList : IReadOnlyList<JavaExecutable>
 /// around it.</summary>
 public static class JavaListLoadTask
 {
-    /// <summary>Fills the list from the detected executables. Returning is success; any
-    /// other exception is a failure whose message is the reason.</summary>
+    /// <summary>Fills the list from the detected executables that ran successfully —
+    /// the upstream list only carries valid installations. Returning is success; any other
+    /// exception is a failure whose message is the reason.</summary>
     public static async Task RunAsync(JavaInstallList vlist, CancellationToken cancellationToken,
         bool onlyManagedVersions = false, AbsolutePath? javaRoot = null,
         IReadOnlyList<IJvmProvider>? providers = null)
@@ -122,6 +123,6 @@ public static class JavaListLoadTask
         var executables = await JavaDetection.DetectAsync(javaRoot, cancellationToken,
             providers: providers, managedOnly: onlyManagedVersions).ConfigureAwait(false);
 
-        vlist.UpdateListData(executables);
+        vlist.UpdateListData(executables.Where(executable => executable.StartFailure is null).ToList());
     }
 }

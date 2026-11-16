@@ -19,12 +19,23 @@ public sealed class JavaDetectEntryJsonConverter : JsonConverter<JavaDetectEntry
     {
         using var document = JsonDocument.ParseValue(ref reader);
         var root = document.RootElement;
+        if (root.ValueKind != JsonValueKind.Object)
+        {
+            throw new JsonException("A java detection entry must be a JSON object.");
+        }
 
         var signature = GetString(root, "signature") ?? "";
-        var languageVersion = root.TryGetProperty("languageVersion", out var language)
-                              && language.ValueKind == JsonValueKind.Number
-            ? language.GetInt32()
-            : (int?)null;
+        int? languageVersion = null;
+        if (root.TryGetProperty("languageVersion", out var language) &&
+            language.ValueKind != JsonValueKind.Null)
+        {
+            if (!language.TryGetInt32(out var languageValue))
+            {
+                throw new JsonException("The java detection languageVersion must be an integer.");
+            }
+
+            languageVersion = languageValue;
+        }
 
         if (root.TryGetProperty("executable", out var executableElement))
         {
@@ -34,7 +45,7 @@ public sealed class JavaDetectEntryJsonConverter : JsonConverter<JavaDetectEntry
         }
 
         var version = GetString(root, "version") ?? "";
-        var parsedVersion = JvmVersion.TryParse(version, out var value) ? value : JvmVersion.Unknown(version);
+        var parsedVersion = JvmVersion.TryParse(version, out var parsed) ? parsed : JvmVersion.Unknown(version);
         var legacy = new JavaExecutable
         {
             Path = "",
