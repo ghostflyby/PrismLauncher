@@ -7,8 +7,6 @@
 // The wire shape is annotated on the model properties; the Solder members are all required
 // except a mod's version, which is nullable.
 
-using System.Text.Json.Serialization;
-
 namespace FlintLauncher.ExternalApi.Technic;
 
 public sealed class SolderPack

@@ -471,8 +471,9 @@ public class ModrinthApiTests : IDisposable
             }
             """, ModrinthJsonContext.Default.ModrinthVersion);
         Assert.NotNull(dto);
-        Assert.Null(dto.Files[0].Hashes["sha512"]);
-        Assert.Equal("abc", dto.Files[0].Hashes["sha1"]);
+        var file = dto.Files[0]!;
+        Assert.Null(file.Hashes["sha512"]);
+        Assert.Equal("abc", file.Hashes["sha1"]);
     }
 
     // ------------------------------------------------------- update check

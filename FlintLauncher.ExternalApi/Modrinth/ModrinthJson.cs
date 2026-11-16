@@ -12,10 +12,9 @@
 //
 // Serialization notes:
 //  - request bodies serialize with WhenWritingNull: a null member means "omit the key";
-//  - `hashes` maps are keyed by arbitrary algorithm names and stay Dictionary<string, string>;
+//  - `hashes` maps are keyed by arbitrary algorithm names; a digest value may be null;
 //  - the POST /version_files (update) responses are hash-keyed maps of versions.
 
-using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace FlintLauncher.ExternalApi.Modrinth;
@@ -122,7 +121,7 @@ public sealed record ModrinthVersion
     public string? Changelog { get; init; }
     public List<ModrinthDependency>? Dependencies { get; init; }
 
-    public required List<ModrinthVersionFile> Files { get; init; }
+    public required List<ModrinthVersionFile?> Files { get; init; }
 }
 
 /// <summary>The spec's VersionDependency: at most one of version_id/project_id is set;
@@ -144,7 +143,7 @@ public sealed record ModrinthVersionFile
     public required string Url { get; init; }
     public required long Size { get; init; }
 
-    public required Dictionary<string, string> Hashes { get; init; }
+    public required Dictionary<string, string?> Hashes { get; init; }
 }
 
 // ------------------------------------------------------------------------- .mrpack format

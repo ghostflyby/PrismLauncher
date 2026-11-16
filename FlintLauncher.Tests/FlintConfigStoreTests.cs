@@ -12,7 +12,6 @@ using System.Net;
 using System.Text.Json;
 using FlintLauncher.Core;
 using FlintLauncher.Core.Config;
-using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Secrets;
 using FlintLauncher.Core.Settings;
 using FlintLauncher.Core.State;

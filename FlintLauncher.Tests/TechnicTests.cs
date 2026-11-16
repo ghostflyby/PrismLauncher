@@ -14,7 +14,6 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.ModPlatform.Technic;
-using FlintLauncher.Core.Net;
 using FlintLauncher.ExternalApi;
 using FlintLauncher.ExternalApi.Technic;
 using Xunit;

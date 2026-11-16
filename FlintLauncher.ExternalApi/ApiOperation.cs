@@ -66,6 +66,10 @@ public static class ApiOperation
     /// <summary>Sends the operation through the given executor. Transport and read failures
     /// surface as the operation's wrapped failure; cancellation propagates
     /// untouched.</summary>
+    /// <typeparam name="TResult">The read result.</typeparam>
+    /// <param name="operation">The operation to send.</param>
+    /// <param name="invoker">The executor that sends the request.</param>
+    /// <param name="ct">The cancellation token for the send and the response read.</param>
     /// <param name="prepare">Runs on the freshly built request before the send — the
     /// caller's transport-policy seam: the request options an invoker's handler chain reads
     /// its behavior from.</param>

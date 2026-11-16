@@ -45,11 +45,8 @@ public static class FlintHttp
         using var window = new RetryHandler.Window(cancellationToken);
         try
         {
-            return await operation.SendTo(http, HttpCompletionOption.ResponseHeadersRead, window.Token, request =>
-            {
-                request.Options.Set(RetryHandler.ManualRetryOption, manualRetry);
-                request.Options.Set(RetryHandler.TimeoutSourceOption, window);
-            }).ConfigureAwait(false);
+            return await operation.SendTo(http, HttpCompletionOption.ResponseHeadersRead, window.Token,
+                RetryHandler.PrepareManualRetry(window, manualRetry)).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (window.TimedOut)
         {

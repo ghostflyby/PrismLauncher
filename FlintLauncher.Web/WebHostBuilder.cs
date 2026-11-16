@@ -19,7 +19,6 @@ using FlintLauncher.Core.IO;
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Migration;
 using FlintLauncher.Core.Net;
-using FlintLauncher.Core.Screenshots;
 using FlintLauncher.Core.Secrets;
 using FlintLauncher.Core.Skins;
 using FlintLauncher.Core.State;
