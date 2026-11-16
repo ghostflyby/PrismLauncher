@@ -34,13 +34,12 @@ public sealed record LauncherState          // stateVersion = 1 起
     public PlaytimeState Playtime { get; init; } = new();          // ← TotalPlayTime / TotalPlayTimeMigrated
     public bool UserAskedAboutAutomaticJavaDownload { get; init; }
     public string LastOfflinePlayerName { get; init; } = "";
-    public JavaDetectState Java { get; init; } = new();            // ← LastHostname + Java 探测缓存（map 化）
+    public JavaDetectState Java { get; init; } = new();            // ← Java 探测缓存（map 化）
     public UiState Ui { get; init; } = new();                      // ← instgroups 的 hidden / ungrouped.hidden（C8）
 }
 public sealed record PlaytimeState { public long Total { get; init; } public bool Migrated { get; init; } }
 public sealed record JavaDetectState
 {
-    public string LastHostname { get; init; } = "";
     public Dictionary<string, JavaDetectEntry> Detections { get; init; } = new();  // key = java 可执行路径
 }
 public sealed record JavaDetectEntry(string Signature, JdkFind.JavaExecutable Executable, int? LanguageVersion = null);

@@ -59,8 +59,8 @@ public class RealLaunchSmokeTests
         var postExitMarker = Path.Combine(root, "post-exit-ran");
         fixture.Global.StubSet("PostExitCommand", $"/usr/bin/touch '{postExitMarker}'");
 
-        // the jar/jar-check lookups resolve against this install root (the former
-        // JavaUtils.LauncherRootPath static test hook); the factory is the composition point
+        // the jar/jar-check lookups resolve against this install root; the factory is the
+        // composition point
         var controller = fixture.CreateFactory(installRoot: launcherRoot).CreateController(
             instance, LaunchMode.Offline, offlineName: "SmokeTester", accountToUse: null,
             accountsProvider: null, autoProceed: true, targetToJoin: null);

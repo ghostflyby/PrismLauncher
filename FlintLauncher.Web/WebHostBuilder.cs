@@ -53,7 +53,7 @@ public static class WebHostBuilder
         IReadOnlyList<AbsolutePath>? migrationSourceParents = null)
     {
         // the five-root layout; tests override to point InstallRoot (the jars/ lookup)
-        // at a fixture root — the former JavaUtils.LauncherRootPath static test hook
+        // at a fixture root
         paths ??= ResolveFlintPaths(args);
         // fail-fast: five roots EnsureDir + writable probe; any unusable root refuses
         // startup with its name (no silent degradation, no half-assembled host)

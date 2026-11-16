@@ -335,7 +335,7 @@ public class FlintConfigStoreTests : IDisposable
     }
 
     [Fact]
-    public void Import_Drops_The_Java_Probe_Quintet_And_Needs_No_State_Keys()
+    public void Import_Ignores_Legacy_Java_Probe_Keys()
     {
         var paths = Paths;
         paths.DataRoot.CreateDirectory();
@@ -352,9 +352,8 @@ public class FlintConfigStoreTests : IDisposable
         var (secrets, state) = NewSideStores();
 
         Assert.NotNull(FlintConfigImporter.Import(paths, store, secrets, state).ImportedIni);
-        // the quintet is state-side and path-keyed now — nothing importable without the path
+        // the legacy probe keys are neither config members nor importable state
         Assert.Empty(state.Current.Java.Detections);
-        Assert.Equal("", state.Current.Java.LastHostname);
         // the ordinary config key still landed and the seal was written
         Assert.Equal(2, store.Current.Launcher.NumberOfManualRetries);
         Assert.True(ConfigPath.ExistsFile());

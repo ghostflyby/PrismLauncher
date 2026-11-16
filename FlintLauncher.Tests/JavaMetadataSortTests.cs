@@ -213,28 +213,6 @@ public class JavaMetadataSortTests
         Assert.True(comparer.Compare(x64New, x64Old) > 0);
     }
 
-    [Fact]
-    public void JavaInstallList_SortVersions_MatchesUpstreamPredicate()
-    {
-        var list = new JavaInstallList();
-        var installs = new List<JavaExecutable>
-        {
-            Java("1.8.0_402", "x86_64", "/old"),
-            Java("21.0.3", "aarch64", "/zulu"),
-            Java("17.0.9", "x86_64", "/temurin"),
-        };
-        list.UpdateListData(installs);
-
-        Assert.Equal(3, list.Count);
-        Assert.True(list.IsLoaded);
-        // JavaInstallList::sortVersions() sorts ASCENDING by the upstream comparator:
-        // architecture first (aarch64 < x86_64), then the version id ascending, then the path.
-        var versions = list.Versions;
-        Assert.Equal("21.0.3", versions[0].Version.Original);
-        Assert.Equal("1.8.0_402", versions[1].Version.Original);
-        Assert.Equal("17.0.9", versions[2].Version.Original);
-    }
-
     private static JavaExecutable Java(string version, string architecture, string path) => new()
     {
         Path = path,

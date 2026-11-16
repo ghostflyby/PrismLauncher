@@ -18,17 +18,6 @@
 //     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //     See the License for the specific language governing permissions and
 //     limitations under the License.
-//
-// Port of launcher/minecraft/launch/AutoInstallJava.{h,cpp}: pick a runtime from the java
-// metadata list matching the profile's compatible java majors (and the OS/arch) and install it
-// through the Java::Manifest/ArchiveDownloadTask machinery.
-//
-// Flow deviations from the C++ (documented):
-//  - The C++ starts the java-meta load task and then emits progressReportingRequest() without
-//    ever starting the javalist load task in the "no download" branch (a latent upstream
-//    hang); the port awaits both load tasks inline, so the proceed() gate is not needed here.
-//  - Task/Task::Ptr plumbing (connect succeeded/failed/progress chains) collapses into
-//    await + state inspection.
 
 using FlintLauncher.Core.Config;
 using FlintLauncher.Core.Instances;
@@ -39,6 +28,7 @@ using FlintLauncher.Core.Meta;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.Settings;
 using FlintLauncher.Core.Tasks;
+using JdkFind;
 using Microsoft.Extensions.Options;
 using TruePath;
 using TruePath.SystemIo;
@@ -48,10 +38,10 @@ namespace FlintLauncher.Core.Launch.Steps;
 
 /// <summary>The runtime-pick/install step. The injected java root is the only layout this
 /// step reads: where the launcher-managed runtimes install (the JavaDir setting under store
-/// semantics, resolved by the factory at step creation). The nullable read face and javalist
-/// keep the bare-fixture degrades (switches off; the "no compatible Java" warning).</summary>
+/// semantics, resolved by the factory at step creation). The nullable config keeps the
+/// bare-fixture degrade (feature off).</summary>
 public sealed class AutoInstallJava(LaunchTask parent, HttpClient http, AbsolutePath javaRoot,
-    IOptionsMonitor<FlintConfigFile>? config = null, JavaInstallList? javaInstallList = null) : LaunchStep(parent)
+    IOptionsMonitor<FlintConfigFile>? config = null) : LaunchStep(parent)
 {
     private readonly MinecraftInstance _instance = parent.Instance;
     private int _majorJavaVersionIndex;
@@ -77,44 +67,34 @@ public sealed class AutoInstallJava(LaunchTask parent, HttpClient http, Absolute
         var packProfile = _instance.GetPackProfile();
         if (!(cfg.CurrentValue.Java.AutomaticJavaDownload ?? false))
         {
-            var javas = javaInstallList;
-            if (javas is not null)
+            IReadOnlyList<JavaExecutable> javaExecutables;
+            try
             {
-                try
-                {
-                    await javas.LoadAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
-                }
-                catch (OperationCanceledException)
-                {
-                    throw;
-                }
-                catch (Exception)
-                {
-                    // a detection failure leaves the list as-is: the walk below finds nothing
-                    // compatible and the step falls back to the default Java, like the C++
-                    // (which only logged the load task's failure)
-                }
+                javaExecutables = await JavaDetection.DetectAsync(javaRoot, cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception)
+            {
+                javaExecutables = [];
+            }
 
-                var compatibleMajors = packProfile.GetProfile()?.GetCompatibleJavaMajors() ?? [];
-                for (var i = 0; i < javas.Count; i++)
+            var compatibleMajors = packProfile.GetProfile()?.GetCompatibleJavaMajors() ?? [];
+            foreach (var java in javaExecutables
+                         .Where(executable => executable.StartFailure is null)
+                         .Order(JavaExecutableComparer.Instance))
+            {
+                if (java.Installation?.LanguageVersion is { } languageVersion && compatibleMajors.Contains(languageVersion))
                 {
-                    var java = javas[i];
-                    if (java.StartFailure is not null)
+                    if (java.MojangArchitecture == "32")
                     {
-                        continue;
+                        EmitLogLine("The automatic Java mechanism detected a 32-bit installation of Java.", MessageLevel.Launcher);
                     }
 
-                    var installation = java.Installation;
-                    if (installation?.LanguageVersion is { } languageVersion && compatibleMajors.Contains(languageVersion))
-                    {
-                        if (!JavaUtils.Is64BitArchitecture(java.Architecture))
-                        {
-                            EmitLogLine("The automatic Java mechanism detected a 32-bit installation of Java.", MessageLevel.Launcher);
-                        }
-
-                        SetJavaPath(new AbsolutePath(java.Path));
-                        return;
-                    }
+                    SetJavaPath(new AbsolutePath(java.Path));
+                    return;
                 }
             }
 
@@ -137,12 +117,9 @@ public sealed class AutoInstallJava(LaunchTask parent, HttpClient http, Absolute
             return;
         }
 
-        var javaDir = javaRoot;
-        var relativeBinary = new LocalPath(wantedJavaName) / "bin" / JavaUtils.JavaExecutable;
-        var wantedJavaPath = javaDir / relativeBinary;
-        if (wantedJavaPath.Exists())
+        var wantedHome = javaRoot / new LocalPath(wantedJavaName);
+        if (await TrySetJavaPathAsync(wantedHome, cancellationToken).ConfigureAwait(false))
         {
-            SetJavaPathFromPartial();
             return;
         }
 
@@ -168,25 +145,23 @@ public sealed class AutoInstallJava(LaunchTask parent, HttpClient http, Absolute
         EmitLogLine($"Compatible Java found at: {path}.", MessageLevel.Launcher);
     }
 
-    private void SetJavaPathFromPartial()
+    private async Task<bool> TrySetJavaPathAsync(AbsolutePath home, CancellationToken cancellationToken)
     {
-        var packProfile = _instance.GetPackProfile();
-        var javaName = packProfile.GetProfile()?.GetCompatibleJavaName() ?? "";
-        var javaDir = javaRoot;
-        // just checking if the executable is there should suffice
-        // but if needed this can be achieved through refreshing the javalist
-        // and retrieving the path that contains the java name
-        var relativeBinary = new LocalPath(javaName) / "bin" / JavaUtils.JavaExecutable;
-        var finalPath = javaDir / relativeBinary;
-        if (finalPath.ExistsFile())
+        var installed = await JdkFinder.Default.FromHomeAsync(home.Value, cancellationToken)
+            .ConfigureAwait(false);
+        if (installed is null || installed.Executable.StartFailure is not null)
         {
-            SetJavaPath(finalPath);
+            return false;
         }
-        else
+
+        var launcherJava = installed.Resolve("javaw") ?? installed.Resolve("java");
+        if (launcherJava is null)
         {
-            EmitLogLine("No compatible Java version was found (the binary file does not exist). Using the default one.",
-                MessageLevel.Warning);
+            return false;
         }
+
+        SetJavaPath(new AbsolutePath(launcherJava.FullName));
+        return true;
     }
 
     private async Task DownloadJava(MetaVersion version, string javaName, CancellationToken cancellationToken)
@@ -233,7 +208,13 @@ public sealed class AutoInstallJava(LaunchTask parent, HttpClient http, Absolute
                         SymlinkTask.Run(finalPath);
                     }
 
-                    SetJavaPathFromPartial();
+                    if (!await TrySetJavaPathAsync(new AbsolutePath(finalPath), cancellationToken)
+                            .ConfigureAwait(false))
+                    {
+                        EmitLogLine(
+                            "No compatible Java version was found (the binary file does not exist). Using the default one.",
+                            MessageLevel.Warning);
+                    }
                 }
                 catch (OperationCanceledException)
                 {

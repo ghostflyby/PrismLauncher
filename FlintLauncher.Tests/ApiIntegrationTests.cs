@@ -577,8 +577,7 @@ public class FlintApiIntegrationTests
                     "--api-token", apiToken,
                     "--urls", "http://127.0.0.1:0",
                 ],
-                // the launch pipeline's jar lookups resolve against this install root (the former
-                // JavaUtils.LauncherRootPath static test hook, now the LaunchFactory paths's InstallRoot)
+                // the launch pipeline's jar lookups resolve against this install root
                 paths: FlintPaths.FromHomeDir(new AbsolutePath(dataDir)) with { InstallRoot = launcherRoot });
             await app.StartAsync();
             using var client = new HttpClient();
@@ -589,6 +588,9 @@ public class FlintApiIntegrationTests
             // seed the java probe cache in the launcher state (the former settings-key
             // seeding — the probe quintet moved out of the settings world) so
             // CheckJava trusts the fake java without running the checker
+            var javaHome = Path.Combine(dataDir, "java-home");
+            Directory.CreateDirectory(javaHome);
+            File.WriteAllText(Path.Combine(javaHome, "release"), "JAVA_VERSION=\"17.0.2\"\n");
             app.Services.GetRequiredService<LauncherStateStore>().Update(state => state with
             {
                 Java = state.Java with
@@ -600,10 +602,11 @@ public class FlintApiIntegrationTests
                             new JavaExecutable
                             {
                                 Path = javaPath,
+                                Home = new DirectoryInfo(javaHome),
                                 Version = JvmVersion.Parse("17.0.2"),
                                 Architecture = "arm64",
                                 VendorRaw = "api-e2e",
-                            }, 17),
+                            }),
                     },
                 },
             });

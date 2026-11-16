@@ -86,8 +86,8 @@ public sealed class CheckJava(LaunchTask parent) : LaunchStep(parent)
         var stored = instance.LauncherState?.Current.Java.Detections.GetValueOrDefault(_detectKey);
 
         // if timestamps are not the same, or something is missing, check! A null
-        // LanguageVersion is either a probe from before the member existed or one JdkFind
-        // could not read a release file for — both get a fresh probe.
+        // LanguageVersion means no release file backs the binary, so compatibility cannot
+        // be decided from the cache.
         if (stored is null || stored.Signature != _javaSignature ||
             stored.Executable.Version.Original.Length == 0 || stored.Executable.Architecture.Length == 0 ||
             stored.Executable.VendorRaw.Length == 0 || stored.LanguageVersion is null)
@@ -138,8 +138,6 @@ public sealed class CheckJava(LaunchTask parent) : LaunchStep(parent)
         }
 
         PrintJavaInfo(version, executable.MojangArchitecture, osArch, vendor);
-        // Installation re-reads the release file on every access — resolve it once here
-        var languageVersion = executable.Installation?.LanguageVersion;
         // write the probe result into the path-keyed state cache, then
         // refresh the runtime context from it — settings are out of the loop
         Parent.Instance.LauncherState?.Update(state =>
@@ -147,7 +145,7 @@ public sealed class CheckJava(LaunchTask parent) : LaunchStep(parent)
             var detections = new Dictionary<string, JavaDetectEntry>(
                 state.Java.Detections, StringComparer.Ordinal)
             {
-                [_detectKey] = new(_javaSignature, executable, languageVersion),
+                [_detectKey] = new(_javaSignature, executable),
             };
             return state with { Java = state.Java with { Detections = detections } };
         });

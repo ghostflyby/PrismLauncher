@@ -60,7 +60,6 @@ public class LauncherStateStoreTests : IDisposable
             Playtime = new PlaytimeState { Total = 42, Migrated = true },
             Java = state.Java with
             {
-                LastHostname = "box",
                 Detections = new Dictionary<string, JavaDetectEntry>(StringComparer.Ordinal)
                 {
                     ["/usr/bin/java"] = new("sig", new JavaExecutable
@@ -69,7 +68,7 @@ public class LauncherStateStoreTests : IDisposable
                         Version = JvmVersion.Parse("17.0.2"),
                         Architecture = "arm64",
                         VendorRaw = "Eclipse Adoptium",
-                    }, 17),
+                    }),
                 },
             },
             Ui = new UiState { HiddenGroups = ["Mods"], UngroupedHidden = true },
@@ -82,7 +81,6 @@ public class LauncherStateStoreTests : IDisposable
         Assert.True(reloaded.Current.Playtime.Migrated);
         Assert.True(reloaded.Current.UserAskedAboutAutomaticJavaDownload);
         Assert.Equal("Steve", reloaded.Current.LastOfflinePlayerName);
-        Assert.Equal("box", reloaded.Current.Java.LastHostname);
         var entry = Assert.Single(reloaded.Current.Java.Detections);
         Assert.Equal("/usr/bin/java", entry.Key);
         Assert.Equal("sig", entry.Value.Signature);
@@ -90,7 +88,6 @@ public class LauncherStateStoreTests : IDisposable
         Assert.Equal("17.0.2", entry.Value.Executable.Version.Original);
         Assert.Equal("arm64", entry.Value.Executable.Architecture);
         Assert.Equal("Eclipse Adoptium", entry.Value.Executable.VendorRaw);
-        Assert.Equal(17, entry.Value.LanguageVersion);
         Assert.Equal(["Mods"], reloaded.Current.Ui.HiddenGroups);
         Assert.True(reloaded.Current.Ui.UngroupedHidden);
     }
@@ -98,20 +95,15 @@ public class LauncherStateStoreTests : IDisposable
     [Fact]
     public void Java_Probe_Map_Keeps_Multiple_JVMs_Apart()
     {
-        // the fix: the five settings keys overwrote each other — the path-keyed map
-        // remembers one entry per binary
         var store = Store();
-        store.Update(state => PutDetection(state, "/jvm/17/bin/java", "sig-17", "17.0.2", 17));
-        store.Update(state => PutDetection(state, "/jvm/8/bin/java", "sig-8", "1.8.0_402", 8));
-        // an entry from before the language version existed stays null through the fold
-        store.Update(state => PutDetection(state, "/jvm/old/bin/java", "sig-old", "11.0.9", null));
+        store.Update(state => PutDetection(state, "/jvm/17/bin/java", "sig-17", "17.0.2"));
+        store.Update(state => PutDetection(state, "/jvm/8/bin/java", "sig-8", "1.8.0_402"));
+        store.Update(state => PutDetection(state, "/jvm/old/bin/java", "sig-old", "11.0.9"));
 
         var reloaded = Store();
         Assert.Equal("17.0.2", reloaded.Current.Java.Detections["/jvm/17/bin/java"].Executable.Version.Original);
-        Assert.Equal(17, reloaded.Current.Java.Detections["/jvm/17/bin/java"].LanguageVersion);
         Assert.Equal("1.8.0_402", reloaded.Current.Java.Detections["/jvm/8/bin/java"].Executable.Version.Original);
-        Assert.Equal(8, reloaded.Current.Java.Detections["/jvm/8/bin/java"].LanguageVersion);
-        Assert.Null(reloaded.Current.Java.Detections["/jvm/old/bin/java"].LanguageVersion);
+        Assert.Equal("11.0.9", reloaded.Current.Java.Detections["/jvm/old/bin/java"].Executable.Version.Original);
     }
 
     [Fact]
@@ -122,15 +114,13 @@ public class LauncherStateStoreTests : IDisposable
                                      {
                                        "stateVersion": 1,
                                        "java": {
-                                         "lastHostname": "",
                                          "detections": {
                                            "/legacy/bin/java": {
                                              "signature": "sig",
                                              "architecture": "64",
                                              "realArchitecture": "arm64",
                                              "version": "17.0.2",
-                                             "vendor": "Legacy",
-                                             "languageVersion": 17
+                                             "vendor": "Legacy"
                                            }
                                          }
                                        }
@@ -144,12 +134,11 @@ public class LauncherStateStoreTests : IDisposable
         Assert.Equal("17.0.2", entry.Executable.Version.Original);
         Assert.Equal("arm64", entry.Executable.Architecture);
         Assert.Equal("Legacy", entry.Executable.VendorRaw);
-        Assert.Equal(17, entry.LanguageVersion);
     }
 
     [Theory]
     [InlineData("{\"stateVersion\":1,\"java\":{\"detections\":{\"/x\":5}}}")]
-    [InlineData("{\"stateVersion\":1,\"java\":{\"detections\":{\"/x\":{\"signature\":\"s\",\"version\":\"17.0.2\",\"languageVersion\":17.5}}}}")]
+    [InlineData("{\"stateVersion\":1,\"java\":{\"detections\":{\"/x\":{\"signature\":\"s\",\"executable\":5}}}}")]
     public void Malformed_JavaDetectEntry_Falls_Back_To_Default(string payload)
     {
         Directory.CreateDirectory(_dir);
@@ -161,7 +150,7 @@ public class LauncherStateStoreTests : IDisposable
         Assert.True(File.Exists(StateFile + ".corrupt"));
     }
 
-    private static LauncherState PutDetection(LauncherState state, string path, string signature, string version, int? languageVersion) =>
+    private static LauncherState PutDetection(LauncherState state, string path, string signature, string version) =>
         state with
         {
             Java = state.Java with
@@ -174,7 +163,7 @@ public class LauncherStateStoreTests : IDisposable
                         Version = JvmVersion.Parse(version),
                         Architecture = "arm64",
                         VendorRaw = "vendor",
-                    }, languageVersion),
+                    }),
                 },
             },
         };

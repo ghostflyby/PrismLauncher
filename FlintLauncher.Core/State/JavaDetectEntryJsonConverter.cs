@@ -20,23 +20,11 @@ public sealed class JavaDetectEntryJsonConverter : JsonConverter<JavaDetectEntry
         }
 
         var signature = GetString(root, "signature") ?? "";
-        int? languageVersion = null;
-        if (root.TryGetProperty("languageVersion", out var language) &&
-            language.ValueKind != JsonValueKind.Null)
-        {
-            if (!language.TryGetInt32(out var languageValue))
-            {
-                throw new JsonException("The java detection languageVersion must be an integer.");
-            }
-
-            languageVersion = languageValue;
-        }
-
         if (root.TryGetProperty("executable", out var executableElement))
         {
             var executable = JsonSerializer.Deserialize(executableElement,
                 (JsonTypeInfo<JavaExecutable>)options.GetTypeInfo(typeof(JavaExecutable))) ?? UnknownExecutable();
-            return new JavaDetectEntry(signature, executable, languageVersion);
+            return new JavaDetectEntry(signature, executable);
         }
 
         var version = GetString(root, "version") ?? "";
@@ -48,7 +36,7 @@ public sealed class JavaDetectEntryJsonConverter : JsonConverter<JavaDetectEntry
             Architecture = GetString(root, "realArchitecture") ?? "",
             VendorRaw = GetString(root, "vendor") ?? "",
         };
-        return new JavaDetectEntry(signature, legacy, languageVersion);
+        return new JavaDetectEntry(signature, legacy);
     }
 
     public override void Write(Utf8JsonWriter writer, JavaDetectEntry value, JsonSerializerOptions options)
@@ -58,15 +46,6 @@ public sealed class JavaDetectEntryJsonConverter : JsonConverter<JavaDetectEntry
         writer.WritePropertyName("executable");
         JsonSerializer.Serialize(writer, value.Executable,
             (JsonTypeInfo<JavaExecutable>)options.GetTypeInfo(typeof(JavaExecutable)));
-        if (value.LanguageVersion is { } languageVersion)
-        {
-            writer.WriteNumber("languageVersion", languageVersion);
-        }
-        else
-        {
-            writer.WriteNull("languageVersion");
-        }
-
         writer.WriteEndObject();
     }
 

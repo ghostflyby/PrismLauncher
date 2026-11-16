@@ -55,11 +55,10 @@ public class CoverageFixCoreTests
         Assert.True(Variant.AsBool(store.Get("AutomaticJavaSwitch")));
         Assert.True(Variant.AsBool(store.Get("AutomaticJavaDownload")));
         Assert.False(Variant.AsBool(store.Get("IgnoreJavaWizard")));
-        // the runtime-state keys (UserAskedAboutAutomaticJavaDownload,
-        // LastHostname, the java probe quintet, LastOfflinePlayerName, TotalPlayTime*) are
-        // NOT settings anymore — launcher-state.json owns them (see LauncherStateStoreTests)
+        // the runtime-state keys (UserAskedAboutAutomaticJavaDownload, the java probe
+        // quintet, LastOfflinePlayerName, TotalPlayTime*) are NOT settings anymore —
+        // launcher-state.json owns them (see LauncherStateStoreTests)
         Assert.Null(FlintConfigKeys.Resolve("UserAskedAboutAutomaticJavaDownload"));
-        Assert.Null(FlintConfigKeys.Resolve("LastHostname"));
         Assert.Null(FlintConfigKeys.Resolve("JavaSignature"));
         Assert.Null(FlintConfigKeys.Resolve("TotalPlayTime"));
         Assert.Null(FlintConfigKeys.Resolve("LastOfflinePlayerName"));

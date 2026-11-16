@@ -14,6 +14,9 @@ internal static class JavaExecutableExtensions
         public string MojangArchitecture =>
             executable.Architecture.Length == 0
                 ? ""
-                : JavaUtils.Is64BitArchitecture(executable.Architecture) ? "64" : "32";
+                : Is64Bit(executable.Architecture) ? "64" : "32";
     }
+
+    private static bool Is64Bit(string osArch) =>
+        osArch is "x86_64" or "amd64" or "aarch64" or "arm64" or "riscv64" or "ppc64le" or "ppc64";
 }
