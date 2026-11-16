@@ -1,122 +1,141 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
 //
-// The JVM detection pipeline, fully on JdkFind facilities: LocateAsync is the primary
-// source (validated installations whose release file is enriched by the runtime probe),
-// and the C++-parity legacy/launcher scan survives only as a candidate producer for what
-// discovery cannot see — each of those candidates is probed through FromExecutable
-// (path-keyed, sanitized child environment, verdict on StartFailure). The JavaCheck.jar
-// checker is gone from this path entirely.
+// The JVM detection pipeline, executable-first: JdkFinder.LocateExecutablesAsync returns
+// every located installation's own java plus the standalone candidates from the configured
+// executable directories. The launcher-owned sources JdkFind cannot know about are added as
+// providers (the managed java root and the official launcher's runtime bundles);
+// FLINT_JAVA_PATHS entries are probed explicitly because they name executables, not homes.
+// The JavaCheck.jar checker is gone from this path entirely.
 //
-// Deviations from the C++ original (launcher/java/JavaInstallList.cpp): the detection list
-// never runs JavaCheck; primary entries stay listed with release-file metadata even when
-// their probe failed (degrade-and-keep), and legacy candidates without any establishable
-// JVM drop instead of listing as unknown.
+// Deviations from the C++ original (launcher/java/JavaInstallList.cpp): a failed standalone
+// probe remains listed with StartFailure instead of being rewritten to "unknown"
+// placeholders, and a candidate without any establishable JVM drops.
 
 using JdkFind;
 using TruePath;
 
 namespace FlintLauncher.Core.Java;
 
-/// <summary>One detected JVM candidate. Primary-layer entries (LocateAsync) are always
-/// valid: a located home has a parseable release file, and a failed runtime probe merely
-/// degrades the metadata. Fallback-layer entries carry the FromExecutable verdict — a
-/// <see cref="JavaExecutable.StartFailure"/> lists the candidate as invalid ("unknown"
-/// placeholders; the /java view keeps it, the install list filters it), and a candidate
-/// with no establishable JVM drops entirely. <see cref="LanguageVersion"/> is the Java SE
-/// feature version JdkFind read from the installation (null when it has none to read).</summary>
-public sealed record JavaCandidate(string Path, JvmVersion Version, int? LanguageVersion, string Architecture, bool Valid);
-
 public static class JavaDetection
 {
-    /// <summary>Runs the detection pipeline: the JdkFind provider suite (or the injected
-    /// providers — the test seam) locates validated installations, then the legacy/launcher
-    /// candidates that were not already covered go through FromExecutable. Deduplication
-    /// across the layers is exact-string on the executable path, matching the upstream list
-    /// semantics. <paramref name="managedOnly"/> is the C++ "managed versions" probe: the
-    /// primary layer is skipped and only the launcher-managed java root is probed (no
-    /// production caller passes it; kept for upstream parity).</summary>
-    public static async Task<IReadOnlyList<JavaCandidate>> DetectAsync(
+    /// <summary>Runs the executable-oriented detection pipeline: the JdkFind provider suite
+    /// (or the injected providers — the test seam) plus the launcher-owned providers, then
+    /// the explicit FLINT_JAVA_PATHS entries. Results keep first-discovery order and are
+    /// deduplicated by executable path. <paramref name="managedOnly"/> is the C++ "managed
+    /// versions" probe: only the launcher-managed java root is scanned (no production caller
+    /// passes it; kept for upstream parity).</summary>
+    public static async Task<IReadOnlyList<JavaExecutable>> DetectAsync(
         AbsolutePath? javaRoot = null,
         CancellationToken cancellationToken = default,
         IReadOnlyList<IJvmProvider>? providers = null,
         bool managedOnly = false)
     {
-        var results = new List<JavaCandidate>();
-        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var located = await BuildFinder(javaRoot, providers, managedOnly)
+            .LocateExecutablesAsync(cancellationToken).ConfigureAwait(false);
 
-        // Primary: the provider suite with the runtime probe enabled (the default). The
-        // probed binary itself is the candidate — the Executable carries the resolved path
-        // (JDK 8 inner-JRE layouts included), the probed version and the reported
-        // architecture, each falling back to the release file.
+        var results = new List<JavaExecutable>(located);
         if (!managedOnly)
         {
-            var jvms = providers is null
-                ? await JdkFinder.Default.LocateAsync(cancellationToken).ConfigureAwait(false)
-                : await new JdkFinder { Providers = providers }.LocateAsync(cancellationToken).ConfigureAwait(false);
-            foreach (var jvm in jvms)
-            {
-                var executable = jvm.Executable;
-                if (!seen.Add(executable.Path))
-                {
-                    continue;
-                }
-
-                results.Add(new JavaCandidate(executable.Path, executable.Version, jvm.LanguageVersion,
-                    Architecture(executable), Valid: true));
-            }
+            results.AddRange(await ProbeEnvironmentPathsAsync(cancellationToken).ConfigureAwait(false));
         }
 
-        // Fallback: the legacy/launcher candidate paths (release-less JVMs, the extra distro
-        // directories, the Minecraft runtime bundle, the managed java root, the env
-        // override), probed path-by-path. A candidate that runs is valid; one backed by a
-        // release file but unable to start lists as invalid; one with no establishable JVM
-        // drops.
-        var fallback = (managedOnly
-                ? JavaUtils.GetPrismJavaBundle(javaRoot)
-                : JavaUtils.FindJavaPaths(javaRoot))
-            .Where(path => !string.IsNullOrWhiteSpace(path))
-            .Where(path => !seen.Contains(path))
-            .Distinct(StringComparer.Ordinal)
-            .ToList();
-        if (fallback.Count > 0)
+        return Deduplicate(results);
+    }
+
+    private static JdkFinder BuildFinder(AbsolutePath? javaRoot, IReadOnlyList<IJvmProvider>? providers,
+        bool managedOnly)
+    {
+        if (managedOnly)
         {
-            var probed = new JavaExecutable?[fallback.Count];
-            await Parallel.ForEachAsync(
-                    Enumerable.Range(0, fallback.Count),
-                    new ParallelOptions
-                    {
-                        MaxDegreeOfParallelism = Environment.ProcessorCount,
-                        CancellationToken = cancellationToken,
-                    },
-                    async (index, token) =>
-                        probed[index] = await JdkFinder.Default.FromExecutableAsync(fallback[index], token)
-                            .ConfigureAwait(false))
-                .ConfigureAwait(false);
-
-            foreach (var executable in probed.OfType<JavaExecutable>())
+            return new JdkFinder
             {
-                if (!seen.Add(executable.Path))
-                {
-                    continue;
-                }
+                Providers = [new ManagedJavaRootJvmProvider(javaRoot)],
+                ExecutableDirectories = [.. LauncherOwnedExecutableDirectories.ForManagedRoot(javaRoot)],
+            };
+        }
 
-                if (executable.StartFailure is not null)
-                {
-                    results.Add(new JavaCandidate(executable.Path, JvmVersion.Unknown("unknown"), null, "unknown", Valid: false));
-                    continue;
-                }
+        // An injected provider list is the test seam: it replaces the system suite and the
+        // default PATH scan so synthetic homes never compete with the machine's JVMs.
+        if (providers is not null)
+        {
+            return JdkFinder.Default with
+            {
+                Providers = [.. providers, new ManagedJavaRootJvmProvider(javaRoot)],
+                ExecutableDirectories = [],
+            };
+        }
 
-                results.Add(new JavaCandidate(executable.Path, executable.Version, executable.Installation?.LanguageVersion,
-                    Architecture(executable), Valid: true));
+        return JdkFinder.Default with
+        {
+            Providers =
+            [
+                .. JdkFinder.Default.Providers,
+                new ManagedJavaRootJvmProvider(javaRoot),
+                new MinecraftRuntimeJvmProvider(),
+            ],
+            ExecutableDirectories =
+            [
+                .. JdkFinder.Default.ExecutableDirectories,
+                .. LauncherOwnedExecutableDirectories.ForManagedRoot(javaRoot),
+                .. LauncherOwnedExecutableDirectories.ForMinecraftRuntime(),
+            ],
+        };
+    }
+
+    /// <summary>Probes the explicit executable paths in FLINT_JAVA_PATHS (upstream's
+    /// addJavasFromEnv): a file is probed verbatim, a directory contributes its java
+    /// executable. These are executable references, not homes, so they cannot ride the
+    /// provider suite.</summary>
+    private static async Task<IReadOnlyList<JavaExecutable>> ProbeEnvironmentPathsAsync(
+        CancellationToken cancellationToken)
+    {
+        var value = Environment.GetEnvironmentVariable($"{FlintConfig.Default.LauncherAppBinaryEnvName}_JAVA_PATHS") ?? "";
+        var paths = value.Split(OperatingSystem.IsWindows() ? ';' : ':',
+            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (paths.Length == 0)
+        {
+            return [];
+        }
+
+        var probed = new JavaExecutable?[paths.Length];
+        await Parallel.ForEachAsync(
+                Enumerable.Range(0, paths.Length),
+                new ParallelOptions
+                {
+                    MaxDegreeOfParallelism = Environment.ProcessorCount,
+                    CancellationToken = cancellationToken,
+                },
+                async (index, token) => probed[index] = await ProbePathAsync(paths[index], token)
+                    .ConfigureAwait(false))
+            .ConfigureAwait(false);
+
+        return probed.OfType<JavaExecutable>().ToList();
+    }
+
+    private static async Task<JavaExecutable?> ProbePathAsync(string path, CancellationToken cancellationToken)
+    {
+        var executable = Directory.Exists(path) ? Path.Combine(path, JavaUtils.JavaExecutable) : path;
+        return File.Exists(executable)
+            ? await JdkFinder.Default.FromExecutableAsync(executable, cancellationToken).ConfigureAwait(false)
+            : null;
+    }
+
+    private static IReadOnlyList<JavaExecutable> Deduplicate(IReadOnlyList<JavaExecutable> executables)
+    {
+        var seen = new HashSet<string>(
+            OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
+                ? StringComparer.OrdinalIgnoreCase
+                : StringComparer.Ordinal);
+        var results = new List<JavaExecutable>(executables.Count);
+        foreach (var executable in executables)
+        {
+            if (seen.Add(Path.GetFullPath(executable.Path)))
+            {
+                results.Add(executable);
             }
         }
 
         return results;
     }
-
-    /// <summary>The reported os.arch — the platform specification guarantees the property,
-    /// so only an unprobed binary can leave it empty.</summary>
-    private static string Architecture(JavaExecutable executable) =>
-        executable.Architecture.Length == 0 ? "unknown" : executable.Architecture;
 }

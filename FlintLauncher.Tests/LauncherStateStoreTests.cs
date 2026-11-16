@@ -10,6 +10,7 @@ using System.Text.Json;
 using FlintLauncher.Core.Instances;
 using FlintLauncher.Core.State;
 using FlintLauncher.Web;
+using JdkFind;
 using TruePath;
 using Xunit;
 
@@ -62,7 +63,13 @@ public class LauncherStateStoreTests : IDisposable
                 LastHostname = "box",
                 Detections = new Dictionary<string, JavaDetectEntry>(StringComparer.Ordinal)
                 {
-                    ["/usr/bin/java"] = new("sig", "64", "arm64", "17.0.2", "Eclipse Adoptium", 17),
+                    ["/usr/bin/java"] = new("sig", new JavaExecutable
+                    {
+                        Path = "/usr/bin/java",
+                        Version = JvmVersion.Parse("17.0.2"),
+                        Architecture = "arm64",
+                        VendorRaw = "Eclipse Adoptium",
+                    }, 17),
                 },
             },
             Ui = new UiState { HiddenGroups = ["Mods"], UngroupedHidden = true },
@@ -78,7 +85,12 @@ public class LauncherStateStoreTests : IDisposable
         Assert.Equal("box", reloaded.Current.Java.LastHostname);
         var entry = Assert.Single(reloaded.Current.Java.Detections);
         Assert.Equal("/usr/bin/java", entry.Key);
-        Assert.Equal(new JavaDetectEntry("sig", "64", "arm64", "17.0.2", "Eclipse Adoptium", 17), entry.Value);
+        Assert.Equal("sig", entry.Value.Signature);
+        Assert.Equal("/usr/bin/java", entry.Value.Executable.Path);
+        Assert.Equal("17.0.2", entry.Value.Executable.Version.Original);
+        Assert.Equal("arm64", entry.Value.Executable.Architecture);
+        Assert.Equal("Eclipse Adoptium", entry.Value.Executable.VendorRaw);
+        Assert.Equal(17, entry.Value.LanguageVersion);
         Assert.Equal(["Mods"], reloaded.Current.Ui.HiddenGroups);
         Assert.True(reloaded.Current.Ui.UngroupedHidden);
     }
@@ -95,11 +107,44 @@ public class LauncherStateStoreTests : IDisposable
         store.Update(state => PutDetection(state, "/jvm/old/bin/java", "sig-old", "11.0.9", null));
 
         var reloaded = Store();
-        Assert.Equal("17.0.2", reloaded.Current.Java.Detections["/jvm/17/bin/java"].Version);
+        Assert.Equal("17.0.2", reloaded.Current.Java.Detections["/jvm/17/bin/java"].Executable.Version.Original);
         Assert.Equal(17, reloaded.Current.Java.Detections["/jvm/17/bin/java"].LanguageVersion);
-        Assert.Equal("1.8.0_402", reloaded.Current.Java.Detections["/jvm/8/bin/java"].Version);
+        Assert.Equal("1.8.0_402", reloaded.Current.Java.Detections["/jvm/8/bin/java"].Executable.Version.Original);
         Assert.Equal(8, reloaded.Current.Java.Detections["/jvm/8/bin/java"].LanguageVersion);
         Assert.Null(reloaded.Current.Java.Detections["/jvm/old/bin/java"].LanguageVersion);
+    }
+
+    [Fact]
+    public void Legacy_JavaDetectEntry_Shape_Is_Read()
+    {
+        Directory.CreateDirectory(_dir);
+        File.WriteAllText(StateFile, """
+                                     {
+                                       "stateVersion": 1,
+                                       "java": {
+                                         "lastHostname": "",
+                                         "detections": {
+                                           "/legacy/bin/java": {
+                                             "signature": "sig",
+                                             "architecture": "64",
+                                             "realArchitecture": "arm64",
+                                             "version": "17.0.2",
+                                             "vendor": "Legacy",
+                                             "languageVersion": 17
+                                           }
+                                         }
+                                       }
+                                     }
+                                     """);
+
+        var store = Store();
+
+        var entry = Assert.Single(store.Current.Java.Detections).Value;
+        Assert.Equal("sig", entry.Signature);
+        Assert.Equal("17.0.2", entry.Executable.Version.Original);
+        Assert.Equal("arm64", entry.Executable.Architecture);
+        Assert.Equal("Legacy", entry.Executable.VendorRaw);
+        Assert.Equal(17, entry.LanguageVersion);
     }
 
     private static LauncherState PutDetection(LauncherState state, string path, string signature, string version, int? languageVersion) =>
@@ -109,7 +154,13 @@ public class LauncherStateStoreTests : IDisposable
             {
                 Detections = new Dictionary<string, JavaDetectEntry>(state.Java.Detections, StringComparer.Ordinal)
                 {
-                    [path] = new(signature, "64", "arm64", version, "vendor", languageVersion),
+                    [path] = new(signature, new JavaExecutable
+                    {
+                        Path = path,
+                        Version = JvmVersion.Parse(version),
+                        Architecture = "arm64",
+                        VendorRaw = "vendor",
+                    }, languageVersion),
                 },
             },
         };

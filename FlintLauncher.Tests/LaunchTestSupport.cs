@@ -14,6 +14,7 @@ using FlintLauncher.Core.Launch.Steps;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.State;
 using FlintLauncher.Web;
+using JdkFind;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using TruePath;
@@ -136,9 +137,16 @@ public sealed class LaunchFixture : IDisposable
     /// the language version explicitly — it is what the launch rules (--add-opens, JNI
     /// rename, compatibility) read, and it must agree with the version string it seeds.</summary>
     public void SeedJavaDetection(string javaPathSetting, long javaUnixTime, int? languageVersion, string version = "17.0.2",
-        string architecture = "64", string realArchitecture = "arm64", string vendor = "fixture")
+        string realArchitecture = "arm64", string vendor = "fixture")
     {
         var key = MinecraftInstance.JavaDetectKey(javaPathSetting);
+        var executable = new JavaExecutable
+        {
+            Path = key,
+            Version = JvmVersion.Parse(version),
+            Architecture = realArchitecture,
+            VendorRaw = vendor,
+        };
         State.Update(state => state with
         {
             Java = state.Java with
@@ -146,9 +154,7 @@ public sealed class LaunchFixture : IDisposable
                 Detections = new Dictionary<string, JavaDetectEntry>(
                     state.Java.Detections, StringComparer.Ordinal)
                 {
-                    [key] = new(
-                        CheckJava.ComputeJavaSignature(javaUnixTime, key),
-                        architecture, realArchitecture, version, vendor, languageVersion),
+                    [key] = new(CheckJava.ComputeJavaSignature(javaUnixTime, key), executable, languageVersion),
                 },
             },
         });

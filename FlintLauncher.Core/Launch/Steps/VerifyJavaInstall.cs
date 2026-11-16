@@ -24,6 +24,7 @@
 // come from the state-side probe cache via the instance, not from settings.
 
 using System.Globalization;
+using FlintLauncher.Core.Java;
 using FlintLauncher.Core.Settings;
 
 namespace FlintLauncher.Core.Launch.Steps;
@@ -35,7 +36,8 @@ public sealed class VerifyJavaInstall(LaunchTask parent) : LaunchStep(parent)
         var instance = Parent.Instance;
         var settings = instance.Settings;
         var detection = instance.JavaDetection();
-        var javaArchitecture = detection?.Architecture ?? "";
+        var executable = detection?.Executable;
+        var javaArchitecture = executable?.MojangArchitecture ?? "";
         var maxMemAlloc = Variant.AsInt(settings.Get("MaxMemAlloc"));
 
         if (javaArchitecture == "32" && maxMemAlloc > 2048)
@@ -65,7 +67,8 @@ public sealed class VerifyJavaInstall(LaunchTask parent) : LaunchStep(parent)
             return Task.CompletedTask;
         }
 
-        var javaDescription = languageVersion?.ToString(CultureInfo.InvariantCulture) ?? detection?.Version ?? "unknown";
+        var javaDescription = languageVersion?.ToString(CultureInfo.InvariantCulture) ??
+                              executable?.Version.Original ?? "unknown";
         EmitLogLine($"This instance is not compatible with Java version {javaDescription}.\n" +
                     "Please switch to one of the following Java versions for this instance:", MessageLevel.Error);
         foreach (var major in compatibleMajors)

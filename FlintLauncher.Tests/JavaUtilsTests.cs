@@ -2,9 +2,9 @@
 // SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
 //
 // Tests for the JVM discovery (macOS-first, matching the host machine), the process environment
-// cleaner. Discovery runs on the JdkFind facilities (LocateAsync primary + FromExecutable
-// fallback) and both layers are tested here with synthetic homes; real-machine assertions are
-// guarded like RealDataSmokeTests.
+// cleaner. Discovery runs on JdkFind's executable-oriented locate plus the launcher-owned
+// providers; the synthetic providers are the test seam, and real-machine assertions are guarded
+// like RealDataSmokeTests.
 
 using FlintLauncher.Core;
 using FlintLauncher.Core.Java;
@@ -49,97 +49,15 @@ public class JavaUtilsTests : IDisposable
         Environment.SetEnvironmentVariable(name, value);
     }
 
-    private static bool MacHasJdk()
-    {
-        if (OperatingSystem.IsMacOS() && File.Exists("/usr/libexec/java_home"))
-        {
-            return true;
-        }
-
-        return Directory.Exists("/Library/Java/JavaVirtualMachines") &&
-               Directory.GetDirectories("/Library/Java/JavaVirtualMachines").Length > 0;
-    }
-
     // ------------------------------------------------------------------ discovery
-
-    [Fact]
-    public void FindJavaPaths_AlwaysContainsTheDefaultJava()
-    {
-        var candidates = JavaUtils.FindJavaPaths();
-
-        Assert.NotEmpty(candidates);
-        Assert.Contains(JavaUtils.GetDefaultJava().Path, candidates);
-        // upstream deduplicates while preserving order
-        Assert.Equal(candidates.Count, candidates.Distinct().Count());
-    }
-
-    [Fact]
-    public void FindJavaPaths_OnMacOS_FindsLibraryJvmBundles()
-    {
-        if (!OperatingSystem.IsMacOS() || !MacHasJdk())
-        {
-            return; // skip-style early return: no JDK on this machine (CI)
-        }
-
-        var candidates = JavaUtils.FindJavaPaths();
-
-        Assert.True(candidates.Count >= 1);
-        // the /Library/Java/JavaVirtualMachines scan is the core of the macOS branch: at least
-        // one installed JVM bundle must produce a candidate java binary
-        var fromLibrary = candidates.Where(c => c.StartsWith("/Library/Java/JavaVirtualMachines/", StringComparison.Ordinal)).ToList();
-        Assert.NotEmpty(fromLibrary);
-        Assert.All(fromLibrary, path => Assert.EndsWith("/bin/java", path));
-        Assert.Contains(fromLibrary, File.Exists);
-    }
-
-    [Fact]
-    public void FindJavaPaths_OnMacOS_DropsAppleJava6Candidates()
-    {
-        if (!OperatingSystem.IsMacOS())
-        {
-            return;
-        }
-
-        var candidates = JavaUtils.FindJavaPaths();
-
-        // the Apple Java 6 era candidates died with the Java <8 support floor
-        Assert.DoesNotContain("/Applications/Xcode.app/Contents/Applications/Application Loader.app/Contents/MacOS/itms/java/bin/java", candidates);
-        Assert.DoesNotContain("/Library/Internet Plug-Ins/JavaAppletPlugin.plugin/Contents/Home/bin/java", candidates);
-        Assert.DoesNotContain("/System/Library/Frameworks/JavaVM.framework/Versions/Current/Commands/java", candidates);
-        Assert.DoesNotContain(candidates, c => c.Contains("Contents/Commands/java", StringComparison.Ordinal));
-    }
-
-    [Fact]
-    public void FindJavaPaths_PicksUpEnvProvidedPaths()
-    {
-        var extra = "/opt/flint-test-jdk/bin/java";
-        SetEnv($"{FlintConfig.Default.LauncherAppBinaryEnvName}_JAVA_PATHS", extra);
-
-        var candidates = JavaUtils.FindJavaPaths();
-
-        Assert.Contains(extra, candidates);
-    }
-
-    [Fact]
-    public void GetDefaultJava_MatchesUpstream()
-    {
-        var java = JavaUtils.GetDefaultJava();
-
-        Assert.Equal("java", java.Id.ToString());
-        Assert.Equal("unknown", java.Arch);
-        Assert.Equal(OperatingSystem.IsWindows() ? "javaw" : "java", java.Path);
-        Assert.Equal(java.Path, JavaUtils.MakeJavaPtr(java.Path, "java").Path);
-    }
 
     [Fact]
     public async Task DetectAsync_MapsAndDeduplicatesTheLayers()
     {
         if (OperatingSystem.IsWindows())
         {
-            return; // JdkFind 0.5's WindowsProgramFilesJvmProvider ignores the injected root,
-                    // so the synthetic home never reaches the primary layer there and the
-                    // fallback probe of the empty stub marks it invalid; windows provider
-                    // coverage waits on the provider suite
+            return; // the fixture names the binary with the unix "java" spelling; the
+                    // Windows provider path is exercised by the system suite instead
         }
         // a synthetic plain-layout JDK home reported by an injected provider is the primary
         // candidate; an env-provided copy of the same path collapses into it, a second env
@@ -172,18 +90,17 @@ public class JavaUtilsTests : IDisposable
         var candidates = await JavaDetection.DetectAsync(providers: [provider]);
 
         var primary = Assert.Single(candidates, c => c.Path == executable);
-        Assert.True(primary.Valid);
         Assert.Equal("21.0.5", primary.Version.Original);
-        Assert.Equal(21, primary.LanguageVersion);
+        Assert.Equal(21, primary.Installation?.LanguageVersion);
         // the probe cannot execute the empty stub java, so metadata degrades to the release
         // file; OS_ARCH is absent from the fixture
-        Assert.Equal("unknown", primary.Architecture);
+        Assert.Equal("", primary.Architecture);
+        Assert.NotNull(primary.StartFailure);
 
-        // release-backed but unable to run: listed, marked invalid
+        // release-backed but unable to run: listed with the StartFailure verdict
         var dead = Assert.Single(candidates, c => c.Path == broken);
-        Assert.False(dead.Valid);
-        Assert.Equal("unknown", dead.Version.Original);
-        Assert.Null(dead.LanguageVersion);
+        Assert.NotNull(dead.StartFailure);
+        Assert.Equal("11.0.1", dead.Version.Original);
 
         // nothing behind it: dropped instead of listed
         Assert.DoesNotContain(candidates, c => c.Path == Path.Combine(root, "nonexistent", "java"));
@@ -200,7 +117,7 @@ public class JavaUtilsTests : IDisposable
         }
 
         // OS_ARCH in the release file feeds the same architecture slot the checker's
-        // os.arch used to — JavaInstall.Is64Bit derives from it downstream
+        // os.arch used to — the 64-bit classifier derives from it downstream
         var root = TempRoot();
         var home = Path.Combine(root, "Contents", "Home");
         Directory.CreateDirectory(Path.Combine(home, "bin"));
@@ -215,10 +132,9 @@ public class JavaUtilsTests : IDisposable
         // scope the assertion to the synthetic home
         var candidate = Assert.Single(candidates,
             c => c.Path == Path.Combine(home, "bin", JavaUtils.JavaExecutable));
-        Assert.True(candidate.Valid);
         Assert.Equal("aarch64", candidate.Architecture);
         Assert.True(JavaUtils.Is64BitArchitecture(candidate.Architecture));
-        Assert.Equal(17, candidate.LanguageVersion);
+        Assert.Equal(17, candidate.Installation?.LanguageVersion);
     }
 
     [Fact]
@@ -226,10 +142,7 @@ public class JavaUtilsTests : IDisposable
     {
         if (OperatingSystem.IsWindows())
         {
-            return; // same root-override gap as DetectAsync_MapsAndDeduplicatesTheLayers:
-                    // WindowsProgramFilesJvmProvider (JdkFind 0.5) scans the machine's
-                    // Program Files, not the injected root, so the synthetic install is
-                    // absent and the runner's real JDKs leak into the list
+            return; // the fixture names the binary with the unix "java" spelling
         }
 
         var root = TempRoot();
@@ -249,10 +162,10 @@ public class JavaUtilsTests : IDisposable
         await JavaListLoadTask.RunAsync(list, TestContext.Current.CancellationToken, providers: [provider]);
 
         var install = Assert.Single(list.Versions, j => j.Path == Path.Combine(home, "bin", JavaUtils.JavaExecutable));
-        Assert.Equal("21.0.5", install.Id.ToString());
-        Assert.Equal(21, install.LanguageVersion);
-        Assert.Equal("x86_64", install.Arch);
-        Assert.True(install.Is64Bit);
+        Assert.Equal("21.0.5", install.Version.Original);
+        Assert.Equal(21, install.Installation?.LanguageVersion);
+        Assert.Equal("x86_64", install.Architecture);
+        Assert.True(JavaUtils.Is64BitArchitecture(install.Architecture));
     }
 
     [Fact]
@@ -260,9 +173,7 @@ public class JavaUtilsTests : IDisposable
     {
         if (OperatingSystem.IsWindows())
         {
-            return; // the keg layout is a unix shape: JdkFind's homebrew provider is
-                    // os-gated on windows and the fallback probe of the empty stub marks
-                    // the candidate invalid there
+            return; // the keg layout and the fixture's binary name are unix shapes
         }
 
         // the Homebrew keg layout (libexec/openjdk.jdk/Contents/Home) is a JdkFind-only
@@ -277,7 +188,8 @@ public class JavaUtilsTests : IDisposable
         var candidates = await JavaDetection.DetectAsync(providers: [new HomebrewJvmProvider([prefix])]);
 
         Assert.Contains(candidates, c =>
-            c.Path == Path.Combine(home, "bin", JavaUtils.JavaExecutable) && c.Valid);
+            c.Path == Path.Combine(home, "bin", JavaUtils.JavaExecutable) &&
+            c.Version.Original == "21.0.5");
     }
 
     // ------------------------------------------------------------- environment

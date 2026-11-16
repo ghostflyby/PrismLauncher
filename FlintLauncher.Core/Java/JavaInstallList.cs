@@ -20,9 +20,9 @@
 //     See the License for the specific language governing permissions and
 //     limitations under the License.
 //
-// Port of launcher/java/JavaInstallList.{h,cpp}: a list of discovered JavaInstall entries plus
-// the JavaListLoadTask that fills it. Detection lives in JavaDetection (JdkFind LocateAsync
-// primary + FromExecutable fallback); this task maps the candidates onto JavaInstall entries.
+// Port of launcher/java/JavaInstallList.{h,cpp}: a sorted list of discovered Java
+// executables plus the JavaListLoadTask that fills it. Detection lives in JavaDetection
+// (JdkFind LocateExecutables), so the list holds JdkFind's JavaExecutable directly.
 //
 // Deviations from the C++ original:
 //  - The BaseVersionList/QAbstractListModel surface (data() roles, VersionPointerRole, ...)
@@ -40,7 +40,7 @@ using TruePath;
 
 namespace FlintLauncher.Core.Java;
 
-public sealed class JavaInstallList : IReadOnlyList<JavaInstall>
+public sealed class JavaInstallList : IReadOnlyList<JavaExecutable>
 {
     private enum Status
     {
@@ -53,7 +53,7 @@ public sealed class JavaInstallList : IReadOnlyList<JavaInstall>
     private readonly AbsolutePath? _javaRoot;
     private Status _status = Status.NotDone;
     private Task? _loadTask;
-    private List<JavaInstall> _vlist = [];
+    private List<JavaExecutable> _vlist = [];
 
     /// <summary><paramref name="javaRoot"/> is the launcher-managed java dir (the JavaDir
     /// setting under store semantics — the host passes the resolved root; the default
@@ -82,16 +82,16 @@ public sealed class JavaInstallList : IReadOnlyList<JavaInstall>
 
     public int Count => _vlist.Count;
 
-    public JavaInstall this[int index] => _vlist[index];
+    public JavaExecutable this[int index] => _vlist[index];
 
-    public IReadOnlyList<JavaInstall> Versions => _vlist;
+    public IReadOnlyList<JavaExecutable> Versions => _vlist;
 
-    public IEnumerator<JavaInstall> GetEnumerator() => _vlist.GetEnumerator();
+    public IEnumerator<JavaExecutable> GetEnumerator() => _vlist.GetEnumerator();
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
     /// <summary>Port of JavaInstallList::updateListData().</summary>
-    public void UpdateListData(IReadOnlyList<JavaInstall> versions)
+    public void UpdateListData(IReadOnlyList<JavaExecutable> versions)
     {
         _vlist = [.. versions];
         SortVersions();
@@ -100,38 +100,28 @@ public sealed class JavaInstallList : IReadOnlyList<JavaInstall>
 
     /// <summary>
     /// Port of JavaInstallList::sortVersions() with the sortJavas predicate: an ASCENDING order
-    /// by JavaInstall::CompareTo (architecture first, then version id, then path).
+    /// by architecture first, then version id, then path.
     /// </summary>
     public void SortVersions()
     {
-        _vlist.Sort();
+        _vlist.Sort(JavaExecutableComparer.Instance);
     }
 }
 
 /// <summary>Port of JavaListLoadTask. The detection itself lives in
-/// <see cref="JavaDetection"/> (JdkFind LocateAsync primary + FromExecutable fallback); this
-/// is the list-model shell around it and maps the candidates onto
-/// <see cref="JavaInstall"/>.</summary>
+/// <see cref="JavaDetection"/> (JdkFind LocateExecutables); this is the list-model shell
+/// around it.</summary>
 public static class JavaListLoadTask
 {
-    /// <summary>Fills the list from the detected installations. Returning is success; any
+    /// <summary>Fills the list from the detected executables. Returning is success; any
     /// other exception is a failure whose message is the reason.</summary>
     public static async Task RunAsync(JavaInstallList vlist, CancellationToken cancellationToken,
         bool onlyManagedVersions = false, AbsolutePath? javaRoot = null,
         IReadOnlyList<IJvmProvider>? providers = null)
     {
-        var candidates = await JavaDetection.DetectAsync(javaRoot, cancellationToken,
+        var executables = await JavaDetection.DetectAsync(javaRoot, cancellationToken,
             providers: providers, managedOnly: onlyManagedVersions).ConfigureAwait(false);
 
-        var installs = candidates
-            .Where(candidate => candidate.Valid)
-            .Select(candidate => new JavaInstall(candidate.Version, candidate.Architecture, candidate.Path)
-            {
-                LanguageVersion = candidate.LanguageVersion,
-                Is64Bit = JavaUtils.Is64BitArchitecture(candidate.Architecture),
-            })
-            .ToList();
-
-        vlist.UpdateListData(installs);
+        vlist.UpdateListData(executables);
     }
 }

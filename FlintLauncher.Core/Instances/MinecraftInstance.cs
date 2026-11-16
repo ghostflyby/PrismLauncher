@@ -238,8 +238,8 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         var detection = JavaDetection();
         // the struct property returns a copy — read-modify-write it back
         var context = RuntimeContext;
-        context.JavaArchitecture = detection?.Architecture ?? "";
-        context.JavaRealArchitecture = detection?.RealArchitecture ?? "";
+        context.JavaArchitecture = detection?.Executable.MojangArchitecture ?? "";
+        context.JavaRealArchitecture = detection?.Executable.Architecture ?? "";
         RuntimeContext = context;
         Components.InvalidateLaunchProfile();
     }

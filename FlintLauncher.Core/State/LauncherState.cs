@@ -11,6 +11,7 @@
 
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Serialization;
+using JdkFind;
 
 namespace FlintLauncher.Core.State;
 
@@ -88,15 +89,15 @@ public sealed record JavaDetectState
 }
 
 /// <summary>One probed java binary (CheckJava writes it after a successful JdkFind probe).
-/// <see cref="LanguageVersion"/> is the Java SE feature version of the backing installation;
-/// null when JdkFind found no release file to read it from — and in entries written before
-/// the member existed, which CheckJava treats as a stale probe.</summary>
+/// The probe result is the JdkFind <see cref="JavaExecutable"/> itself; <see cref="Signature"/>
+/// is the launcher's file-mtime + path invalidation stamp. <see cref="LanguageVersion"/> is
+/// the Java SE feature version of the backing installation; null when JdkFind found no
+/// release file to read it from — and in entries written before the member existed, which
+/// CheckJava treats as a stale probe.</summary>
+[JsonConverter(typeof(JavaDetectEntryJsonConverter))]
 public sealed record JavaDetectEntry(
     string Signature,
-    string Architecture,
-    string RealArchitecture,
-    string Version,
-    string Vendor,
+    JavaExecutable Executable,
     int? LanguageVersion = null);
 
 /// <summary>The machine-local group view state (the instgroups.json "hidden" half; group NAMES stay the

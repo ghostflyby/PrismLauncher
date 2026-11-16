@@ -30,6 +30,7 @@ using FlintLauncher.ExternalApi.Ftb;
 using FlintLauncher.ExternalApi.Modrinth;
 using FlintLauncher.ExternalApi.Technic;
 using FlintLauncher.Web;
+using JdkFind;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using TruePath;
@@ -596,7 +597,13 @@ public class FlintApiIntegrationTests
                         state.Java.Detections, StringComparer.Ordinal)
                     {
                         [javaPath] = new(CheckJava.ComputeJavaSignature(javaUnixTime, javaPath),
-                            "64", "arm64", "17.0.2", "api-e2e", 17),
+                            new JavaExecutable
+                            {
+                                Path = javaPath,
+                                Version = JvmVersion.Parse("17.0.2"),
+                                Architecture = "arm64",
+                                VendorRaw = "api-e2e",
+                            }, 17),
                     },
                 },
             });

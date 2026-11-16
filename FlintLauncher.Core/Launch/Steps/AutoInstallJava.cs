@@ -99,9 +99,15 @@ public sealed class AutoInstallJava(LaunchTask parent, HttpClient http, Absolute
                 for (var i = 0; i < javas.Count; i++)
                 {
                     var java = javas[i];
-                    if (java.LanguageVersion is { } languageVersion && compatibleMajors.Contains(languageVersion))
+                    if (java.StartFailure is not null)
                     {
-                        if (!java.Is64Bit)
+                        continue;
+                    }
+
+                    var installation = java.Installation;
+                    if (installation?.LanguageVersion is { } languageVersion && compatibleMajors.Contains(languageVersion))
+                    {
+                        if (!JavaUtils.Is64BitArchitecture(java.Architecture))
                         {
                             EmitLogLine("The automatic Java mechanism detected a 32-bit installation of Java.", MessageLevel.Launcher);
                         }

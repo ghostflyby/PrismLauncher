@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
 //
-// Tests for the Java::Metadata and JavaInstall comparators and the metadata parser. The C++
+// Tests for the Java::Metadata and JavaExecutable comparators and the metadata parser. The C++
 // tests directory only carries JavaVersion_test.cpp (no JavaMetadata/JavaInstall comparator
 // tests), so these are table checks written against the upstream operator semantics.
 
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Java;
+using JdkFind;
 using Xunit;
 
 namespace FlintLauncher.Tests;
@@ -197,44 +198,51 @@ public class JavaMetadataSortTests
         Assert.False(valid < invalid);
     }
 
-    // ------------------------------------------------------- JavaInstall comparators
+    // ---------------------------------------------------- JavaExecutable comparators
 
     [Fact]
-    public void JavaInstall_SortsByArchThenVersionThenPath()
+    public void JavaExecutable_SortsByArchThenVersionThenPath()
     {
-        var x64New = new JavaInstall("17.0.9", "x86_64", "/a");
-        var x64Old = new JavaInstall("11.0.2", "x86_64", "/b");
-        var arm64 = new JavaInstall("21", "aarch64", "/c");
+        var comparer = JavaExecutableComparer.Instance;
+        var x64New = Java("17.0.9", "x86_64", "/a");
+        var x64Old = Java("11.0.2", "x86_64", "/b");
+        var arm64 = Java("21", "aarch64", "/c");
 
         // architecture compares first (natural, case-insensitive: aarch64 < x86_64)
-        Assert.True(arm64 < x64New);
-        Assert.True(x64Old < x64New);
+        Assert.True(comparer.Compare(arm64, x64New) < 0);
+        Assert.True(comparer.Compare(x64Old, x64New) < 0);
         // equal arch + version: the path breaks the tie
-        Assert.True(new JavaInstall("17", "x86_64", "/a") < new JavaInstall("17", "x86_64", "/b"));
-        Assert.True(x64New == new JavaInstall("17.0.9", "x86_64", "/a"));
-        Assert.True(x64New > x64Old);
+        Assert.True(comparer.Compare(Java("17", "x86_64", "/a"), Java("17", "x86_64", "/b")) < 0);
+        Assert.True(comparer.Compare(x64New, Java("17.0.9", "x86_64", "/a")) == 0);
+        Assert.True(comparer.Compare(x64New, x64Old) > 0);
     }
 
     [Fact]
     public void JavaInstallList_SortVersions_MatchesUpstreamPredicate()
     {
         var list = new JavaInstallList();
-        var installs = new List<JavaInstall>
+        var installs = new List<JavaExecutable>
         {
-            new("1.8.0_402", "x86_64", "/old"),
-            new("21.0.3", "aarch64", "/zulu"),
-            new("17.0.9", "x86_64", "/temurin"),
+            Java("1.8.0_402", "x86_64", "/old"),
+            Java("21.0.3", "aarch64", "/zulu"),
+            Java("17.0.9", "x86_64", "/temurin"),
         };
         list.UpdateListData(installs);
 
         Assert.Equal(3, list.Count);
         Assert.True(list.IsLoaded);
-        // JavaInstallList::sortVersions() sorts ASCENDING by JavaInstall::CompareTo (the
-        // operator< trichotomy). Architecture compares first (aarch64 < x86_64), then the
-        // version id ascending, then the path.
+        // JavaInstallList::sortVersions() sorts ASCENDING by the upstream comparator:
+        // architecture first (aarch64 < x86_64), then the version id ascending, then the path.
         var versions = list.Versions;
-        Assert.Equal("21.0.3", versions[0].Id.ToString());
-        Assert.Equal("1.8.0_402", versions[1].Id.ToString());
-        Assert.Equal("17.0.9", versions[2].Id.ToString());
+        Assert.Equal("21.0.3", versions[0].Version.Original);
+        Assert.Equal("1.8.0_402", versions[1].Version.Original);
+        Assert.Equal("17.0.9", versions[2].Version.Original);
     }
+
+    private static JavaExecutable Java(string version, string architecture, string path) => new()
+    {
+        Path = path,
+        Version = JvmVersion.Parse(version),
+        Architecture = architecture,
+    };
 }
