@@ -42,9 +42,9 @@ public static class JavaEnvironment
             environment[key] = value;
         }
 
-        if (OperatingSystem.IsLinux() && !environment.ContainsKey("LD_LIBRARY_PATH"))
+        if (OperatingSystem.IsLinux())
         {
-            environment["LD_LIBRARY_PATH"] = "";
+            environment.TryAdd("LD_LIBRARY_PATH", "");
         }
 
         return environment;
@@ -52,7 +52,7 @@ public static class JavaEnvironment
 
     internal static string RemoveEntries(string target, string remove)
     {
-        var separator = OperatingSystem.IsWindows() ? ';' : ':';
+        var separator = Path.PathSeparator;
         var kept = target.Split(separator).ToList();
         foreach (var entry in remove.Split(separator))
         {

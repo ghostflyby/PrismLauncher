@@ -138,7 +138,7 @@ internal sealed class JavaPathsJvmProvider : IJvmProvider
             OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
                 ? StringComparer.OrdinalIgnoreCase
                 : StringComparer.Ordinal);
-        foreach (var path in value.Split(OperatingSystem.IsWindows() ? ';' : ':',
+        foreach (var path in value.Split(Path.PathSeparator,
                      StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
             foreach (var home in HomesFor(path))
