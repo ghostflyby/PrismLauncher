@@ -20,7 +20,6 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using FlintLauncher.Core.Minecraft;
-using FlintLauncher.Core.Text;
 using JdkFind;
 
 namespace FlintLauncher.Core.Java;
@@ -39,6 +38,9 @@ public enum JavaDownloadType
 public sealed record JavaMetadata : IComparable<JavaMetadata>,
     IComparisonOperators<JavaMetadata, JavaMetadata, bool>
 {
+    private static readonly StringComparer NumericIgnoreCase = StringComparer.Create(
+        CultureInfo.InvariantCulture, CompareOptions.NumericOrdering | CompareOptions.IgnoreCase);
+
     /// <summary>Port of BaseVersion::descriptor().</summary>
     public string Descriptor() => Version.ToString();
 
@@ -212,7 +214,7 @@ public sealed record JavaMetadata : IComparable<JavaMetadata>,
             }
         }
 
-        return Math.Sign(StringUtils.NaturalCompare(Name, other.Name, ignoreCase: true));
+        return NumericIgnoreCase.Compare(Name, other.Name);
     }
 
     /// <summary>Port of Metadata::operator==.</summary>

@@ -15,7 +15,7 @@
 |---|---|---|---|
 | `Version.{h,cpp}` | `FlintLauncher.Core/Versioning/McVersion.cs` | ported | FlexVer + 空格特例；70 条官方向量全过 |
 | `java/JavaVersion.{h,cpp}` | `FlintLauncher.Core/Java/JavaVersion.cs` | ported | |
-| `StringUtils.{h,cpp}` | `FlintLauncher.Core/Text/StringUtils.cs` | partial | 仅 NaturalCompare（ordinal 代替 locale）；其余按需补 |
+| `StringUtils.{h,cpp}` | —（BCL `StringComparer`） | replaced | naturalCompare 用 `CompareOptions.NumericOrdering` + `InvariantCulture`；其余未移植 |
 | `FileSystem.{h,cpp}` | `FlintLauncher.Core/IO/FileSystem.cs` | partial | 平台中立子集（copy/move/delete/combine/原子写等）；reflink/trash/desktop 等记录为 skip |
 | `GZip.{h,cpp}` | — | deleted（GZ UTIL） | 零生产调用方：level.dat 读写由 NbtIo 的 gzip/raw 自动探测吸收，日志端点按纯文本读；残留 gz 需求直接用 BCL GZipStream |
 | `Json.{h,cpp}` | `FlintLauncher.Core/Json/JsonUtils.cs` | ported | require/ensure 全家（JsonNode 单 DOM 读模型，2026-10-03 起唯一轨道：element 双轨家族已删除）+ to/from list/map；QVariant 部分不适用 |

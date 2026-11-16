@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
 
-using FlintLauncher.Core.Text;
+using System.Globalization;
 using JdkFind;
 
 namespace FlintLauncher.Core.Java;
@@ -10,6 +10,9 @@ namespace FlintLauncher.Core.Java;
 /// applied to JdkFind's executable view.</summary>
 public sealed class JavaExecutableComparer : IComparer<JavaExecutable>
 {
+    private static readonly StringComparer NumericIgnoreCase = StringComparer.Create(
+        CultureInfo.InvariantCulture, CompareOptions.NumericOrdering | CompareOptions.IgnoreCase);
+
     public static JavaExecutableComparer Instance { get; } = new();
 
     public int Compare(JavaExecutable? x, JavaExecutable? y)
@@ -29,7 +32,7 @@ public sealed class JavaExecutableComparer : IComparer<JavaExecutable>
             return 1;
         }
 
-        var archCompare = Math.Sign(StringUtils.NaturalCompare(x.Architecture, y.Architecture, ignoreCase: true));
+        var archCompare = NumericIgnoreCase.Compare(x.Architecture, y.Architecture);
         if (archCompare != 0)
         {
             return archCompare;
@@ -41,6 +44,6 @@ public sealed class JavaExecutableComparer : IComparer<JavaExecutable>
             return versionCompare;
         }
 
-        return Math.Sign(StringUtils.NaturalCompare(x.Path, y.Path, ignoreCase: true));
+        return NumericIgnoreCase.Compare(x.Path, y.Path);
     }
 }
