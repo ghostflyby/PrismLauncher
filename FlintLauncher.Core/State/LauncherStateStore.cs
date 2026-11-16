@@ -77,11 +77,7 @@ public sealed class LauncherStateStore
     };
 
     private static JavaDetectEntry NormalizeEntry(JavaDetectEntry? entry) =>
-        entry is null
-            ? new JavaDetectEntry("", UnknownExecutable())
-            : entry.Executable is null
-                ? new JavaDetectEntry(entry.Signature ?? "", UnknownExecutable(), entry.LanguageVersion)
-                : entry with { Signature = entry.Signature ?? "" };
+        entry ?? new JavaDetectEntry("", UnknownExecutable());
 
     private static JavaExecutable UnknownExecutable() => new()
     {
