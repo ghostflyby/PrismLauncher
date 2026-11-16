@@ -46,7 +46,7 @@ public static class JavaDetection
             results.AddRange(await ProbeEnvironmentPathsAsync(seen, cancellationToken).ConfigureAwait(false));
         }
 
-        return Deduplicate(results);
+        return results;
     }
 
     private static JdkFinder BuildFinder(AbsolutePath? javaRoot, IReadOnlyList<IJvmProvider>? providers,
@@ -139,21 +139,6 @@ public static class JavaDetection
             .ConfigureAwait(false);
 
         return probed.OfType<JavaExecutable>().ToList();
-    }
-
-    private static IReadOnlyList<JavaExecutable> Deduplicate(IReadOnlyList<JavaExecutable> executables)
-    {
-        var seen = new HashSet<string>(PathComparer);
-        var results = new List<JavaExecutable>(executables.Count);
-        foreach (var executable in executables)
-        {
-            if (seen.Add(CanonicalExecutablePath(executable.Path)))
-            {
-                results.Add(executable);
-            }
-        }
-
-        return results;
     }
 
     private static StringComparer PathComparer =>
