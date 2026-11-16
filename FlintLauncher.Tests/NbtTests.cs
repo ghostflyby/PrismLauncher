@@ -8,12 +8,15 @@
 using System.Buffers.Binary;
 using System.Text;
 using FlintLauncher.Nbt;
+using Myitian.Text;
 using Xunit;
 
 namespace FlintLauncher.Tests;
 
 public class NbtTests
 {
+    private static readonly Encoding ModifiedUtf8 = new ModifiedUTF8Encoding(throwOnInvalidBytes: true);
+
     // ---------------------------------------------------------------- round trips
 
     [Fact]
@@ -302,8 +305,8 @@ public class NbtTests
     public void ModifiedUtf8_Nul_IsTwoBytes()
     {
         // Java modified UTF-8: U+0000 -> C0 80 (plain UTF-8: a single 00 byte)
-        Assert.Equal(new byte[] { 0xC0, 0x80 }, ModifiedUtf8.Encode("\0"));
-        Assert.Equal("\0", ModifiedUtf8.Decode([0xC0, 0x80]));
+        Assert.Equal(new byte[] { 0xC0, 0x80 }, ModifiedUtf8.GetBytes("\0"));
+        Assert.Equal("\0", ModifiedUtf8.GetString([0xC0, 0x80]));
     }
 
     [Fact]
@@ -314,43 +317,54 @@ public class NbtTests
         var netUtf8 = Encoding.UTF8.GetBytes("\U00010000");
         Assert.Equal(new byte[] { 0xF0, 0x90, 0x80, 0x80 }, netUtf8);
 
-        var modified = ModifiedUtf8.Encode("\U00010000");
+        var modified = ModifiedUtf8.GetBytes("\U00010000");
         Assert.Equal(new byte[] { 0xED, 0xA0, 0x80, 0xED, 0xB0, 0x80 }, modified);
 
-        Assert.Equal("\U00010000", ModifiedUtf8.Decode(modified));
+        Assert.Equal("\U00010000", ModifiedUtf8.GetString(modified));
     }
 
     [Fact]
     public void ModifiedUtf8_MixedString_RoundTrip()
     {
         var value = "a\0\u00e9\u4f60\u597d\U0001F600"; // 1-byte, NUL, 2-byte, 3-byte, astral
-        var bytes = ModifiedUtf8.Encode(value);
-        Assert.Equal(value, ModifiedUtf8.Decode(bytes));
+        var bytes = ModifiedUtf8.GetBytes(value);
+        Assert.Equal(value, ModifiedUtf8.GetString(bytes));
     }
 
     [Fact]
     public void ModifiedUtf8_LoneSurrogate_RoundTrips()
     {
         // readUTF-compatible leniency: a lone surrogate survives the round trip
-        var bytes = ModifiedUtf8.Encode("\ud83d");
+        var bytes = ModifiedUtf8.GetBytes("\ud83d");
         Assert.Equal(new byte[] { 0xED, 0xA0, 0xBD }, bytes);
-        Assert.Equal("\ud83d", ModifiedUtf8.Decode(bytes));
+        Assert.Equal("\ud83d", ModifiedUtf8.GetString(bytes));
     }
 
     [Fact]
     public void ModifiedUtf8_Decodes_PlainUtf8AstralSequence_Leniently()
     {
         // Some tools write standard UTF-8; Java's readUTF rejects it but we accept it.
-        Assert.Equal("\U00010000", ModifiedUtf8.Decode([0xF0, 0x90, 0x80, 0x80]));
+        Assert.Equal("\U00010000", ModifiedUtf8.GetString([0xF0, 0x90, 0x80, 0x80]));
     }
 
     [Fact]
     public void ModifiedUtf8_MalformedInput_Throws()
     {
-        Assert.Throws<NbtParseException>(() => ModifiedUtf8.Decode([0x80]));             // lone continuation byte
-        Assert.Throws<NbtParseException>(() => ModifiedUtf8.Decode([0xC3]));             // truncated 2-byte
-        Assert.Throws<NbtParseException>(() => ModifiedUtf8.Decode([0xE4, 0xBD]));       // truncated 3-byte
-        Assert.Throws<NbtParseException>(() => ModifiedUtf8.Decode([0xE4, 0xBD, 0xC3])); // bad continuation
+        AssertMalformed([0x80]);             // lone continuation byte
+        AssertMalformed([0xC3]);             // truncated 2-byte
+        AssertMalformed([0xE4, 0xBD]);       // truncated 3-byte
+        AssertMalformed([0xE4, 0xBD, 0xC3]); // bad continuation
+    }
+
+    private static void AssertMalformed(byte[] encoded)
+    {
+        var stream = new MemoryStream();
+        Span<byte> length = stackalloc byte[2];
+        BinaryPrimitives.WriteUInt16BigEndian(length, (ushort)encoded.Length);
+        stream.Write(length);
+        stream.Write(encoded);
+        stream.Position = 0;
+        Assert.Throws<NbtParseException>(() => new NbtReader(stream).ReadString());
     }
 
     [Fact]
@@ -475,7 +489,7 @@ public class NbtTests
 
     private static void WriteStringBytes(MemoryStream stream, string value)
     {
-        var encoded = ModifiedUtf8.Encode(value);
+        var encoded = ModifiedUtf8.GetBytes(value);
         Span<byte> tmp = stackalloc byte[2];
         BinaryPrimitives.WriteUInt16BigEndian(tmp, (ushort)encoded.Length);
         stream.Write(tmp);

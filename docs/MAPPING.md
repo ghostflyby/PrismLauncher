@@ -64,7 +64,7 @@
 
 | 原文件 | C# 目标 | 状态 | 备注 |
 |---|---|---|---|
-| `libraries/libnbtplusplus`（launcher 用子集） | `FlintLauncher.Nbt/` | ported | 全 Tag 集、Java modified-UTF-8、gzip/raw 自检、插入序 Compound |
+| `libraries/libnbtplusplus`（launcher 用子集） | `FlintLauncher.Nbt/` | ported | 全 Tag 集、Java modified-UTF-8（Myitian.Text.ModifiedUTF8Encoding）、gzip/raw 自检、插入序 Compound |
 | `BaseInstance*` `NullInstance.h` | `FlintLauncher.Core/Instances/BaseInstance.cs` `NullInstance.cs` | ported | 设置注册/游玩时长/快捷方式/链接实例；Qt 信号→事件 |
 | `minecraft/MinecraftInstance*` | `FlintLauncher.Core/Instances/MinecraftInstance.cs` | ported | 全部设置组与路径访问器；launch 管线 TODO(P5) |
 | `InstanceList*` | `FlintLauncher.Core/Instances/InstanceList.cs` + `Instances/InstanceGroupModel.cs` | ported | 组半边归 InstanceGroupModel（G4：config 侧 groups.json 成员 uuid 化 C8/D3 + state 侧 hidden S5）；D2 寻址链（inode→uuid→dirname）ResolveInstance 唯一入口；QAbstractListModel/Watcher 不移植 |

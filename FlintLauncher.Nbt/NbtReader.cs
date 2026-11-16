@@ -14,6 +14,8 @@
 //    length fails at end-of-stream instead of attempting a huge allocation.
 
 using System.Buffers.Binary;
+using System.Text;
+using Myitian.Text;
 
 namespace FlintLauncher.Nbt;
 
@@ -21,6 +23,8 @@ public sealed class NbtReader(Stream input)
 {
     /// <summary>Port of libnbt++'s MAX_DEPTH in nbt::io::stream_reader.</summary>
     public const int MaxDepth = 1024;
+
+    private static readonly Encoding ModifiedUtf8 = new ModifiedUTF8Encoding(throwOnInvalidBytes: true);
 
     private readonly Stream _input = input ?? throw new ArgumentNullException(nameof(input));
     private long _offset;
@@ -213,7 +217,14 @@ public sealed class NbtReader(Stream input)
     {
         var length = ReadUShort();
         var bytes = ReadExact(length);
-        return ModifiedUtf8.Decode(bytes);
+        try
+        {
+            return ModifiedUtf8.GetString(bytes);
+        }
+        catch (DecoderFallbackException e)
+        {
+            throw new NbtParseException($"Malformed modified UTF-8 string: {e.Message}", e);
+        }
     }
 
     public short ReadShort()
