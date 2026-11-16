@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
 
-using FlintLauncher.Core;
 using FlintLauncher.Core.Java;
 using JdkFind;
 using JdkFind.Providers;
@@ -13,16 +12,10 @@ namespace FlintLauncher.Tests;
 public class JavaDiscoveryTests : IDisposable
 {
     private const string JavaBinary = "java";
-    private readonly List<(string name, string? value)> _savedEnv = [];
     private readonly List<string> _tempRoots = [];
 
     public void Dispose()
     {
-        foreach (var (name, value) in _savedEnv)
-        {
-            Environment.SetEnvironmentVariable(name, value);
-        }
-
         foreach (var root in _tempRoots)
         {
             try
@@ -40,12 +33,6 @@ public class JavaDiscoveryTests : IDisposable
         return root;
     }
 
-    private void SetEnv(string name, string? value)
-    {
-        _savedEnv.Add((name, Environment.GetEnvironmentVariable(name)));
-        Environment.SetEnvironmentVariable(name, value);
-    }
-
     private static async Task WriteRunnableJavaAsync(string path, string version, string architecture)
     {
         await File.WriteAllTextAsync(path, $"""
@@ -61,7 +48,7 @@ public class JavaDiscoveryTests : IDisposable
     }
 
     [Fact]
-    public async Task DetectAsync_MapsAndDeduplicatesTheLayers()
+    public async Task DetectAsync_ReportsReleaseMetadataAndStartFailure()
     {
         if (OperatingSystem.IsWindows())
         {
@@ -72,22 +59,23 @@ public class JavaDiscoveryTests : IDisposable
         var brokenRoot = TempRoot();
         var home = Path.Combine(root, "jdk-21.0.5");
         Directory.CreateDirectory(Path.Combine(home, "bin"));
-        await File.WriteAllTextAsync(Path.Combine(home, "bin", "java"), "");
+        await File.WriteAllTextAsync(Path.Combine(home, "bin", JavaBinary), "");
         await File.WriteAllTextAsync(Path.Combine(home, "release"), "JAVA_VERSION=\"21.0.5\"\n");
         var brokenHome = Path.Combine(brokenRoot, "jdk-broken");
         Directory.CreateDirectory(Path.Combine(brokenHome, "bin"));
-        await File.WriteAllTextAsync(Path.Combine(brokenHome, "bin", "java"), "");
+        await File.WriteAllTextAsync(Path.Combine(brokenHome, "bin", JavaBinary), "");
         await File.WriteAllTextAsync(Path.Combine(brokenHome, "release"), "JAVA_VERSION=\"11.0.1\"\n");
 
         IJvmProvider provider = OperatingSystem.IsMacOS()
             ? new MacOsJvmProvider([root])
             : new UnixJvmProvider(root);
+        IJvmProvider brokenProvider = OperatingSystem.IsMacOS()
+            ? new MacOsJvmProvider([brokenRoot])
+            : new UnixJvmProvider(brokenRoot);
         var executable = Path.Combine(home, "bin", JavaBinary);
         var broken = Path.Combine(brokenHome, "bin", JavaBinary);
-        SetEnv($"{FlintConfig.Default.LauncherAppBinaryEnvName}_JAVA_PATHS",
-            string.Join(Path.PathSeparator, executable, broken, Path.Combine(root, "nonexistent", "java")));
 
-        var candidates = await JavaDetection.DetectAsync(providers: [provider]);
+        var candidates = await JavaDetection.DetectAsync(providers: [provider, brokenProvider]);
 
         var primary = Assert.Single(candidates, c => c.Path == executable);
         Assert.Equal("21.0.5", primary.Version.Original);
@@ -98,8 +86,6 @@ public class JavaDiscoveryTests : IDisposable
         var dead = Assert.Single(candidates, c => c.Path == broken);
         Assert.NotNull(dead.StartFailure);
         Assert.Equal("11.0.1", dead.Version.Original);
-
-        Assert.DoesNotContain(candidates, c => c.Path == Path.Combine(root, "nonexistent", "java"));
     }
 
     [Fact]

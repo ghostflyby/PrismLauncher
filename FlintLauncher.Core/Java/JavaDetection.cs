@@ -28,12 +28,7 @@ public static class JavaDetection
         {
             return JdkFinder.Default with
             {
-                Providers =
-                [
-                    .. providers,
-                    new ManagedJavaRootJvmProvider(javaRoot),
-                    new JavaPathsJvmProvider(),
-                ],
+                Providers = [.. providers, new ManagedJavaRootJvmProvider(javaRoot)],
                 ExecutableDirectories = [],
             };
         }
@@ -45,9 +40,7 @@ public static class JavaDetection
                 .. JdkFinder.Default.Providers,
                 new ManagedJavaRootJvmProvider(javaRoot),
                 new MinecraftRuntimeJvmProvider(),
-                new JavaPathsJvmProvider(),
             ],
         };
     }
-
 }

@@ -17,10 +17,10 @@ internal sealed class ManagedJavaRootJvmProvider(AbsolutePath? root) : IJvmProvi
             yield break;
         }
 
-        IEnumerable<string> children;
+        List<string> children;
         try
         {
-            children = Directory.EnumerateDirectories(root.Value.Value);
+            children = [.. Directory.EnumerateDirectories(root.Value.Value)];
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
@@ -123,55 +123,6 @@ internal sealed class MinecraftRuntimeJvmProvider : IJvmProvider
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
             return [];
-        }
-    }
-}
-
-internal sealed class JavaPathsJvmProvider : IJvmProvider
-{
-    public string Name => "flint-java-paths";
-
-    public IEnumerable<string> GetJavaHomes()
-    {
-        var value = Environment.GetEnvironmentVariable($"{FlintConfig.Default.LauncherAppBinaryEnvName}_JAVA_PATHS") ?? "";
-        var seen = new HashSet<string>(
-            OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
-                ? StringComparer.OrdinalIgnoreCase
-                : StringComparer.Ordinal);
-        foreach (var path in value.Split(Path.PathSeparator,
-                     StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-        {
-            foreach (var home in HomesFor(path))
-            {
-                if (seen.Add(home))
-                {
-                    yield return home;
-                }
-            }
-        }
-    }
-
-    private static IEnumerable<string> HomesFor(string path)
-    {
-        if (Directory.Exists(path))
-        {
-            if (JavaHomeLayout.Probe(path) is { } home)
-            {
-                yield return home;
-            }
-
-            yield break;
-        }
-
-        if (!File.Exists(path))
-        {
-            yield break;
-        }
-
-        var executable = JdkFinder.Default.FromExecutable(path);
-        if (executable?.Installation?.Home is { } executableHome)
-        {
-            yield return executableHome.FullName;
         }
     }
 }
