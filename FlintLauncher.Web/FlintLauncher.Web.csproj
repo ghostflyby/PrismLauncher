@@ -14,7 +14,7 @@
     <ProjectReference Include="..\FlintLauncher.Core\FlintLauncher.Core.csproj"/>
     <!-- .NET 10 built-in OpenAPI: source-generated documents under Native AOT (the
          reflection-based generator is not AOT-safe, the package's generator is). -->
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.14"/>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.15"/>
   </ItemGroup>
 
   <ItemGroup>
