@@ -9,7 +9,6 @@
 // the ones a document must carry), and only the modeled members are read — the serializer
 // ignores the rest.
 
-using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace FlintLauncher.ExternalApi.Flame;
@@ -67,7 +66,7 @@ public sealed record FlameDependency(
 /// <summary>A CurseForge file (the /mods/.../files shapes). GameVersions mixes MC versions
 /// with loader/side strings, and the loader reads them in place.</summary>
 public sealed record FlameModFile(
-    List<string>? GameVersions,
+    List<string?>? GameVersions,
     int? ModId,
     int? Id,
     string? FileDate,

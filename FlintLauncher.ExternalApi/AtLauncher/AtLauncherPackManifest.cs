@@ -368,7 +368,7 @@ public static class AtLauncherPackManifest
             throw new JsonException("'type' is not a string");
         }
 
-        if (version.Configs is { Sha1: null } configs)
+        if (version.Configs is { Sha1: null })
         {
             throw new JsonException("'sha1' is not a string");
         }

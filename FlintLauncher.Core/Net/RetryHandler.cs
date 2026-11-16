@@ -37,6 +37,24 @@ public sealed class RetryHandler : DelegatingHandler
     /// retry flags above.</summary>
     public static readonly HttpRequestOptionsKey<Window> TimeoutSourceOption = new("Flint.TimeoutSource");
 
+    /// <summary>Prepares the fresh request of a send with the manual-retry gate and the
+    /// exchange window.</summary>
+    internal static Action<HttpRequestMessage> PrepareManualRetry(Window window, bool manualRetry) =>
+        request =>
+        {
+            request.Options.Set(ManualRetryOption, manualRetry);
+            request.Options.Set(TimeoutSourceOption, window);
+        };
+
+    /// <summary>Prepares the fresh request of a send with the 429/503 retry gate and the
+    /// exchange window.</summary>
+    internal static Action<HttpRequestMessage> PrepareAutoRetry(Window window, bool autoRetry) =>
+        request =>
+        {
+            request.Options.Set(AutoRetryOption, autoRetry);
+            request.Options.Set(TimeoutSourceOption, window);
+        };
+
     /// <summary>The C++ RequestTimeout default: the window when the setting is left
     /// unconfigured, and the clamp fallback for a below-a-second value.</summary>
     public static readonly TimeSpan DefaultRequestTimeout = TimeSpan.FromSeconds(60);

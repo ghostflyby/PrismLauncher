@@ -90,7 +90,7 @@ public sealed class MsaDeviceCodeStep(AccountData data, AuthEndpointsOptions? au
 
             // the loader rejects an answer without the codes and a positive expiry; a stated
             // positive interval overrides the client's default
-            if (authorization.Interval is int interval and > 0)
+            if (authorization.Interval is { } interval && interval > 0)
             {
                 _interval = interval;
             }

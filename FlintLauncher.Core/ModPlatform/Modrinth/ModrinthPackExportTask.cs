@@ -158,7 +158,7 @@ public static class ModrinthPackExportTask
                     continue;
                 }
 
-                foreach (var file in v.Files)
+                foreach (var file in v.Files.OfType<ModrinthVersionFile>())
                 {
                     if (file.Hashes.TryGetValue("sha512", out var hash) != true || hash != sha512)
                     {
@@ -167,7 +167,7 @@ public static class ModrinthPackExportTask
 
                     // map the file to the url
                     resolvedFiles[relative] = new ResolvedFile(
-                        Sha1: file.Hashes.GetValueOrDefault("sha1", ""),
+                        Sha1: file.Hashes.GetValueOrDefault("sha1", "") ?? "",
                         Sha512: sha512,
                         Url: file.Url,
                         Size: file.Size,

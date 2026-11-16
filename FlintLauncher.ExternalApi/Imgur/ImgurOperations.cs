@@ -27,7 +27,6 @@
 // the upstream texts as InvalidOperationException inside the wrapped failure.
 
 using System.Net.Http.Headers;
-using System.Text;
 using System.Text.Json;
 
 namespace FlintLauncher.ExternalApi.Imgur;

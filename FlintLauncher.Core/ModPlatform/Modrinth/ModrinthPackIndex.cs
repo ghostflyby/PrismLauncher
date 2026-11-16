@@ -151,7 +151,15 @@ public static class ModrinthPackIndex
 
         // the context's nullability checks are property-level, so a null file element can
         // still bind into the list
-        var files = dto.Files.Where(file => file is not null).ToList();
+        var files = new List<ModrinthVersionFile>(dto.Files.Count);
+        foreach (var entry in dto.Files)
+        {
+            if (entry is not null)
+            {
+                files.Add(entry);
+            }
+        }
+
         var fileCount = files.Count;
 
         if (fileCount == 0)

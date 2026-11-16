@@ -55,11 +55,9 @@ public class ApiOperationTests
     [Fact]
     public async Task EnsureSuccess_ErrorBody_Read_Failure_Still_Surfaces_The_Status()
     {
-        using var response = new HttpResponseMessage(HttpStatusCode.NotFound)
-        {
-            Content = new ThrowingContent(),
-            RequestMessage = new HttpRequestMessage(HttpMethod.Get, "http://stub/missing"),
-        };
+        using var response = new HttpResponseMessage(HttpStatusCode.NotFound);
+        response.Content = new ThrowingContent();
+        response.RequestMessage = new HttpRequestMessage(HttpMethod.Get, "http://stub/missing");
 
         var status = await Assert.ThrowsAsync<HttpRequestException>(() =>
             response.EnsureSuccessAsync(CancellationToken.None));

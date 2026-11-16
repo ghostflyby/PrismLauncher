@@ -42,11 +42,7 @@ public static class AuthStepHttp
         try
         {
             return await operation.SendTo(http, HttpCompletionOption.ResponseHeadersRead, window.Token,
-                request =>
-                {
-                    request.Options.Set(RetryHandler.AutoRetryOption, autoRetry);
-                    request.Options.Set(RetryHandler.TimeoutSourceOption, window);
-                }).ConfigureAwait(false);
+                RetryHandler.PrepareAutoRetry(window, autoRetry)).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (window.TimedOut)
         {
