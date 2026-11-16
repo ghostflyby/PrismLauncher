@@ -8,4 +8,8 @@
     <IsAotCompatible>true</IsAotCompatible>
   </PropertyGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Myitian.Text.ModifiedUTF8Encoding" Version="1.2.2"/>
+  </ItemGroup>
+
 </Project>

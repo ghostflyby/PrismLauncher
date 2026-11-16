@@ -14,6 +14,8 @@
 // payload-only (their type lives in the list header), which is what WritePayload is for.
 
 using System.Buffers.Binary;
+using System.Text;
+using Myitian.Text;
 
 namespace FlintLauncher.Nbt;
 
@@ -21,6 +23,8 @@ public sealed class NbtWriter(Stream output)
 {
     /// <summary>Maximum length of an NBT string in encoded bytes (16-bit unsigned).</summary>
     public const int MaxStringLength = ushort.MaxValue;
+
+    private static readonly Encoding ModifiedUtf8 = new ModifiedUTF8Encoding();
 
     /// <summary>Maximum length of an NBT list or array (32-bit signed).</summary>
     public const long MaxArrayLength = int.MaxValue;
@@ -98,7 +102,7 @@ public sealed class NbtWriter(Stream output)
     /// <summary>Port of stream_writer::write_string (encodes as modified UTF-8).</summary>
     public void WriteString(string value)
     {
-        var bytes = ModifiedUtf8.Encode(value);
+        var bytes = ModifiedUtf8.GetBytes(value);
         if (bytes.Length > MaxStringLength)
         {
             throw new ArgumentOutOfRangeException(nameof(value), bytes.Length,
