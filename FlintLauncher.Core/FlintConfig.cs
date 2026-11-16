@@ -33,7 +33,6 @@ public sealed class FlintConfig
     public string LauncherConfigFile { get; init; } = "flint.cfg";
 
     public string LauncherGit { get; init; } = "https://github.com/PrismLauncher/PrismLauncher";
-    public string LauncherAppBinaryEnvName { get; init; } = "FLINT";
 
     public string UserAgent { get; init; } = $"Flint/{DefaultVersionString}";
 

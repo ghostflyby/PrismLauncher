@@ -203,13 +203,10 @@ public sealed class LaunchFactory(
         new(parent, paths.InstallRoot, loggerFactory, ui);
 
     /// <summary>The runtime-pick/install step. Public for hosts that build partial chains.
-    /// The java root and the managed-versions javalist resolve here, at step creation: the
-    /// JavaDir setting under store semantics (falling back to the store/java anchor), and a
-    /// fresh javalist over that root so a launch never reuses a previous launch's detection
-    /// state.</summary>
+    /// The java root resolves here, at step creation: the JavaDir setting under store
+    /// semantics, falling back to the store/java anchor.</summary>
     public AutoInstallJava CreateAutoInstallJava(LaunchTask parent) =>
-        new(parent, http, dirs?.JavaRoot ?? paths.JavaRoot, config,
-            dirs is null ? null : new JavaInstallList(javaRoot: dirs.JavaRoot));
+        new(parent, http, dirs?.JavaRoot ?? paths.JavaRoot, config);
 
     /// <summary>The memory-pressure gate. Public for hosts that build partial chains.</summary>
     public EnsureAvailableMemory CreateEnsureAvailableMemory(LaunchTask parent) =>

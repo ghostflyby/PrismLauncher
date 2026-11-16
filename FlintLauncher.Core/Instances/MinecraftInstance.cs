@@ -41,7 +41,7 @@
 //  - createUpdateTask()/createLaunchTask()/createLaunchScript() are the launch pipeline
 //    (Launch/LaunchTask + Launch/Steps/*). The switcheroo/MangoHud capability probing and
 //    the icon save remain hooks (see above).
-//  - The CleanEnviroment() base of createEnvironment() is JavaUtils.CleanEnvironment().
+//  - The CleanEnviroment() base of createEnvironment() is JavaEnvironment.Clean().
 //  - The folder models for resource packs, texture packs, shader packs and data packs are
 //    not ported yet (only ModFolderModel/WorldList exist), so resourcePackList()/
 //    texturePackList()/shaderPackList()/dataPackList()/resourceLists() are omitted; the
@@ -238,8 +238,8 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
         var detection = JavaDetection();
         // the struct property returns a copy — read-modify-write it back
         var context = RuntimeContext;
-        context.JavaArchitecture = detection?.Architecture ?? "";
-        context.JavaRealArchitecture = detection?.RealArchitecture ?? "";
+        context.JavaArchitecture = detection?.Executable.MojangArchitecture ?? "";
+        context.JavaRealArchitecture = detection?.Executable.Architecture ?? "";
         RuntimeContext = context;
         Components.InvalidateLaunchProfile();
     }
@@ -683,9 +683,7 @@ public class MinecraftInstance : BaseInstance, IPackProfileEnv
 
     public override SortedDictionary<string, string> CreateEnvironment()
     {
-        // prepare the process environment (C++ starts from CleanEnviroment(); the sanitized
-        // OS environment is the JavaUtils.CleanEnvironment port)
-        var env = JavaUtils.CleanEnvironment();
+        var env = JavaEnvironment.Clean();
 
         // export some infos
         foreach (var (key, value) in GetVariables())

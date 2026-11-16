@@ -1,17 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2026 FlintLauncher Contributors
-//
-// The launcher-state.json store: one TypedJsonFile per state
-// root, load-or-default with the stateVersion evolution gate, and immediate atomic writes on
-// every mutation. The loaded record lives in <see cref="Current"/> so the
-// hot paths (java probe cache lookups, playtime accumulation) never touch the disk; writers
-// go through <see cref="Update"/> which replaces the immutable snapshot and persists it.
-//
-// The JsonTypeInfo comes from the host's source-generated context (FlintJsonContext —
-// the registration list stays in one place); Core only ever sees the opaque
-// type-info handle, so no reflection ever enters the picture (AOT red line).
 
 using System.Text.Json.Serialization.Metadata;
+using JdkFind;
 using TruePath;
 
 namespace FlintLauncher.Core.State;
@@ -67,14 +58,20 @@ public sealed class LauncherStateStore
 
     private static JavaDetectState NormalizeJava(JavaDetectState java) => java with
     {
-        LastHostname = java.LastHostname,
         Detections = new Dictionary<string, JavaDetectEntry>(
             java.Detections.ToDictionary(
                 pair => pair.Key,
-                pair => pair.Value is null
-                    ? new JavaDetectEntry("", "", "", "", "")
-                    : new JavaDetectEntry(Signature: pair.Value.Signature ?? "", Architecture: pair.Value.Architecture ?? "", RealArchitecture: pair.Value.RealArchitecture ?? "", Version: pair.Value.Version ?? "", Vendor: pair.Value.Vendor ?? "", LanguageVersion: pair.Value.LanguageVersion)),
+                pair => NormalizeEntry(pair.Value)),
             StringComparer.Ordinal),
+    };
+
+    private static JavaDetectEntry NormalizeEntry(JavaDetectEntry? entry) =>
+        entry ?? new JavaDetectEntry("", UnknownExecutable());
+
+    private static JavaExecutable UnknownExecutable() => new()
+    {
+        Path = "",
+        Version = JvmVersion.Unknown(),
     };
 
     /// <summary>Apply <paramref name="mutate"/> to the snapshot and persist immediately

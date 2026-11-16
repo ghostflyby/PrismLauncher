@@ -14,6 +14,7 @@ using FlintLauncher.Core.Launch.Steps;
 using FlintLauncher.Core.Net;
 using FlintLauncher.Core.State;
 using FlintLauncher.Web;
+using JdkFind;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using TruePath;
@@ -131,14 +132,30 @@ public sealed class LaunchFixture : IDisposable
     }
 
     /// <summary>Seed the java probe cache for a configured java path so CheckJava trusts
-    /// the binary without running the checker (the former settings-key seeding): the
-    /// stored signature matches ComputeJavaSignature(mtime, resolved-path). The caller names
-    /// the language version explicitly — it is what the launch rules (--add-opens, JNI
-    /// rename, compatibility) read, and it must agree with the version string it seeds.</summary>
+    /// the binary without running the checker. The stored signature matches
+    /// ComputeJavaSignature(mtime, resolved-path); a non-null <paramref name="languageVersion"/>
+    /// backs the executable with a synthetic home whose release file carries the same version.</summary>
     public void SeedJavaDetection(string javaPathSetting, long javaUnixTime, int? languageVersion, string version = "17.0.2",
-        string architecture = "64", string realArchitecture = "arm64", string vendor = "fixture")
+        string realArchitecture = "arm64", string vendor = "fixture")
     {
         var key = MinecraftInstance.JavaDetectKey(javaPathSetting);
+        DirectoryInfo? home = null;
+        if (languageVersion is not null)
+        {
+            var homePath = Path.Combine(Root, "java-probe-homes", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(homePath);
+            File.WriteAllText(Path.Combine(homePath, "release"), $"JAVA_VERSION=\"{version}\"\n");
+            home = new DirectoryInfo(homePath);
+        }
+
+        var executable = new JavaExecutable
+        {
+            Path = key,
+            Home = home,
+            Version = JvmVersion.Parse(version),
+            Architecture = realArchitecture,
+            VendorRaw = vendor,
+        };
         State.Update(state => state with
         {
             Java = state.Java with
@@ -146,9 +163,7 @@ public sealed class LaunchFixture : IDisposable
                 Detections = new Dictionary<string, JavaDetectEntry>(
                     state.Java.Detections, StringComparer.Ordinal)
                 {
-                    [key] = new(
-                        CheckJava.ComputeJavaSignature(javaUnixTime, key),
-                        architecture, realArchitecture, version, vendor, languageVersion),
+                    [key] = new(CheckJava.ComputeJavaSignature(javaUnixTime, key), executable),
                 },
             },
         });
@@ -171,10 +186,8 @@ public sealed class LaunchFixture : IDisposable
 
     /// <summary>
     /// The fixture's launch factory (headless: null logger unless the test attaches one,
-    /// no config store — the java/download switches stay off, matching the former unset
-    /// static providers). The optional installRoot stands in for the former
-    /// JavaUtils.LauncherRootPath test hook (the jars/NewLaunch.jar lookup), xmlLogParsing
-    /// for the former XmlParsingEnabled gate.
+    /// no config store — the java/download switches stay off). The optional installRoot
+    /// sets the jars/NewLaunch.jar lookup root, xmlLogParsing sets the log parsing gate.
     /// </summary>
     public LaunchFactory CreateFactory(ILoggerFactory? loggerFactory = null, string? installRoot = null,
         bool xmlLogParsing = false)

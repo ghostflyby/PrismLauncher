@@ -40,18 +40,6 @@ public static class FlintConfigImporter
     private const string KeyTotalPlayTimeMigrated = "TotalPlayTimeMigrated";
     private const string KeyUserAskedAboutAutomaticJavaDownload = "UserAskedAboutAutomaticJavaDownload";
     private const string KeyLastOfflinePlayerName = "LastOfflinePlayerName";
-    private const string KeyLastHostname = "LastHostname";
-
-    /// <summary>The java probe quintet: recognized as state, but NOT importable (the cache keys the
-    /// cache by the probed binary path, which the INI never carried).</summary>
-    public static readonly IReadOnlyList<string> JavaProbeKeys =
-    [
-        "JavaSignature",
-        "JavaArchitecture",
-        "JavaRealArchitecture",
-        "JavaVersion",
-        "JavaVendor",
-    ];
 
     /// <summary>Run the projection. Returns what happened: the projected INI path, the
     /// unreadable INI path, or <see cref="ImportResult.Idle"/> when no chain file was found
@@ -124,11 +112,9 @@ public static class FlintConfigImporter
         var chainPlaytimeMigrated = FindBool(ini, KeyTotalPlayTimeMigrated);
         var userAskedAboutAutomaticJavaDownload = FindBool(ini, KeyUserAskedAboutAutomaticJavaDownload) ?? false;
         var lastOfflinePlayerName = FindString(ini, KeyLastOfflinePlayerName) ?? "";
-        var lastHostname = FindString(ini, KeyLastHostname) ?? "";
         var sawStateKeys = chainTotalPlayTime is not null || chainPlaytimeMigrated is not null
                            || userAskedAboutAutomaticJavaDownload
-                           || lastOfflinePlayerName.Length != 0 || lastHostname.Length != 0
-                           || ini.Keys.Any(JavaProbeKeys.Contains);
+                           || lastOfflinePlayerName.Length != 0;
 
         // merge: per member, the playtime probe outranks the in-chain fallback, and a value
         // the launcher already recorded outranks both
@@ -148,9 +134,6 @@ public static class FlintConfigImporter
                 LastOfflinePlayerName = current.LastOfflinePlayerName.Length != 0
                     ? current.LastOfflinePlayerName
                     : lastOfflinePlayerName,
-                Java = current.Java.LastHostname.Length == 0 && lastHostname.Length != 0
-                    ? current.Java with { LastHostname = lastHostname }
-                    : current.Java,
             });
         }
 

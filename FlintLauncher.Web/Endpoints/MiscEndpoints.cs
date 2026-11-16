@@ -157,10 +157,10 @@ public static class MiscEndpoints
 }
 
 /// <summary>Cached java discovery (GET serves the cache, POST re-scans). The scan is the
-/// shared detection pipeline (JavaDetection): JdkFind primary + the checker-validated
-/// legacy/launcher fallback, so the launcher-managed java root — the JavaDir setting under
+/// shared detection pipeline (JavaDetection): JdkFind's executable-oriented locate plus the
+/// launcher-owned providers, so the launcher-managed java root — the JavaDir setting under
 /// store semantics — is covered like the system-wide sources. Wire shape unchanged:
-/// invalid fallback candidates list as ("unknown", "unknown").</summary>
+/// candidates with a start failure list as ("unknown", "unknown").</summary>
 public sealed class JavaScanService(ConfiguredDirs dirs)
 {
     private readonly SemaphoreSlim _lock = new(1, 1);
@@ -210,7 +210,9 @@ public sealed class JavaScanService(ConfiguredDirs dirs)
     {
         var candidates = await JavaDetection.DetectAsync(dirs.JavaRoot);
         var scanned = candidates
-            .Select(candidate => new JavaView(candidate.Path, candidate.Version.Original, candidate.Architecture))
+            .Select(candidate => candidate.StartFailure is null
+                ? new JavaView(candidate.Path, candidate.Version.Original, candidate.Architecture)
+                : new JavaView(candidate.Path, "unknown", "unknown"))
             .ToArray();
         _cache = scanned;
         return scanned;

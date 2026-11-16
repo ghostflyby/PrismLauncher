@@ -11,6 +11,7 @@ using FlintLauncher.Core.State;
 using FlintLauncher.Core.Store;
 using FlintLauncher.Web.Endpoints;
 using FlintLauncher.Web.Models;
+using JdkFind;
 
 namespace FlintLauncher.Web;
 
@@ -162,6 +163,7 @@ namespace FlintLauncher.Web;
 [JsonSerializable(typeof(PlaytimeState))]
 [JsonSerializable(typeof(JavaDetectState))]
 [JsonSerializable(typeof(JavaDetectEntry))]
+[JsonSerializable(typeof(JavaExecutable))]
 [JsonSerializable(typeof(UiState))]
 // secrets.json — TypedJsonFile root
 [JsonSerializable(typeof(SecretsFile))]

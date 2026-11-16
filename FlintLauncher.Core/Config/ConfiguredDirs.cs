@@ -16,8 +16,8 @@ namespace FlintLauncher.Core.Config;
 /// member reads the live snapshot, so a settings write is visible on the next access.</summary>
 public sealed class ConfiguredDirs(FlintPaths paths, IOptionsMonitor<FlintConfigFile> config)
 {
-    /// <summary>The launcher-managed java root: consumed by the java scan, the
-    /// JavaInstallList managed-versions probe and the launch pipeline's AutoInstallJava.</summary>
+    /// <summary>The launcher-managed java root, consumed by the java scan and the launch
+    /// pipeline's AutoInstallJava.</summary>
     public AbsolutePath JavaRoot =>
         string.IsNullOrWhiteSpace(config.CurrentValue.Dirs.JavaDir)
             ? paths.JavaRoot

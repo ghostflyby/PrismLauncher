@@ -86,17 +86,18 @@ public sealed class CheckJava(LaunchTask parent) : LaunchStep(parent)
         var stored = instance.LauncherState?.Current.Java.Detections.GetValueOrDefault(_detectKey);
 
         // if timestamps are not the same, or something is missing, check! A null
-        // LanguageVersion is either a probe from before the member existed or one JdkFind
-        // could not read a release file for — both get a fresh probe.
-        if (stored is null || stored.Signature != _javaSignature || stored.Version.Length == 0 ||
-            stored.Architecture.Length == 0 || stored.RealArchitecture.Length == 0 || stored.Vendor.Length == 0 ||
-            stored.LanguageVersion is null)
+        // LanguageVersion means no release file backs the binary, so compatibility cannot
+        // be decided from the cache.
+        if (stored is null || stored.Signature != _javaSignature ||
+            stored.Executable.Version.Original.Length == 0 || stored.Executable.Architecture.Length == 0 ||
+            stored.Executable.VendorRaw.Length == 0 || stored.LanguageVersion is null)
         {
             await ProbeJavaAsync(realJavaPath, cancellationToken).ConfigureAwait(false);
             return;
         }
 
-        PrintJavaInfo(stored.Version, stored.Architecture, stored.RealArchitecture, stored.Vendor);
+        PrintJavaInfo(stored.Executable.Version.Original, stored.Executable.MojangArchitecture,
+            stored.Executable.Architecture, stored.Executable.VendorRaw);
         Parent.Instance.UpdateRuntimeContext();
     }
 
@@ -136,10 +137,7 @@ public sealed class CheckJava(LaunchTask parent) : LaunchStep(parent)
             return;
         }
 
-        var mojangPlatform = JavaUtils.Is64BitArchitecture(osArch) ? "64" : "32";
-        PrintJavaInfo(version, mojangPlatform, osArch, vendor);
-        // Installation re-reads the release file on every access — resolve it once here
-        var languageVersion = executable.Installation?.LanguageVersion;
+        PrintJavaInfo(version, executable.MojangArchitecture, osArch, vendor);
         // write the probe result into the path-keyed state cache, then
         // refresh the runtime context from it — settings are out of the loop
         Parent.Instance.LauncherState?.Update(state =>
@@ -147,13 +145,7 @@ public sealed class CheckJava(LaunchTask parent) : LaunchStep(parent)
             var detections = new Dictionary<string, JavaDetectEntry>(
                 state.Java.Detections, StringComparer.Ordinal)
             {
-                [_detectKey] = new(
-                    _javaSignature,
-                    mojangPlatform,
-                    osArch,
-                    version,
-                    vendor,
-                    languageVersion),
+                [_detectKey] = new(_javaSignature, executable),
             };
             return state with { Java = state.Java with { Detections = detections } };
         });

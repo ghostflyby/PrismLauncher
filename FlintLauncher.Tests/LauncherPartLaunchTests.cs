@@ -23,9 +23,8 @@ public class LauncherPartLaunchTests : IDisposable
     public LauncherPartLaunchTests()
     {
         Directory.CreateDirectory(_root);
-        // the jar lookup (Application::getJarPath) searches <install root>/jars/NewLaunch.jar;
-        // the factories below point the injected FlintPaths.InstallRoot at this fixture root
-        // (the former JavaUtils.LauncherRootPath static test hook)
+        // the jar lookup searches <install root>/jars/NewLaunch.jar; the factories below
+        // point the injected FlintPaths.InstallRoot at this fixture root
         Directory.CreateDirectory(Path.Combine(_root, "jars"));
         File.WriteAllText(Path.Combine(_root, "jars", LauncherJars.NewLaunchJarName), "dummy jar bytes");
     }
