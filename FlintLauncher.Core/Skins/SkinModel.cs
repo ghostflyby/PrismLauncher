@@ -133,7 +133,8 @@ public static class SkinListStore
             var root = JsonSerializer.Deserialize(manifestPath.ReadAllBytes(), SkinJsonContext.Default.SkinIndexJson);
             foreach (var entry in root?.Skins ?? [])
             {
-                var model = SkinModel.FromWire(skinsDir, entry);
+                var model = SkinModel.FromWire(skinsDir,
+                    entry ?? throw new JsonException("Value is not an object"));
                 if (IsValid(model))
                 {
                     newSkins.Add(model);
@@ -143,6 +144,7 @@ public static class SkinListStore
         catch (Exception e) when (e is JsonException or IOException or InvalidOperationException)
         {
             // qCritical() << "Couldn't load skins json:" << e.cause();
+            newSkins.Clear();
         }
 
         return newSkins;

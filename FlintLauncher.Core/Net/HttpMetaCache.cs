@@ -454,6 +454,12 @@ public sealed class HttpMetaCache(AbsolutePath path) : IDisposable
         {
             foreach (var raw in array)
             {
+                // a null entry is the former QJsonValue::toObject() empty object -> no base
+                if (raw is null)
+                {
+                    continue;
+                }
+
                 var baseId = raw.Base;
                 if (!_basePaths.ContainsKey(baseId))
                 {

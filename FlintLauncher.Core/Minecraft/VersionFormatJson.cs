@@ -10,11 +10,11 @@
 // (docs/JSON-MIGRATION.md, the Qt write-tail batch: patches and mmc-pack have no external
 // write consumer; the values are the contract).
 //
-// Failure behavior: the former Require* reads become document-level JsonException
-// failures with the collapsed kind texts ("'sha1' is not a string"); per-field quirks with
-// external meaning are preserved (library 'name' missing keeps the upstream typo message,
-// assetIndex-absent synthesizes from 'assets', minimumLauncherVersion > 18 warns, the
-// removed-feature members add problems, uid keeps the fileId fallback and the regex check).
+// Failure behavior: required members are enforced by the wire; collection elements are
+// still checked by the mapper because STJ does not enforce element nullability. Optional
+// members keep their QJsonValue defaults (assetIndex synthesizes from 'assets',
+// minimumLauncherVersion > 18 warns, the removed-feature members add problems, uid keeps
+// the fileId fallback and the regex check).
 
 using System.Text.Json;
 using System.Text.Json.Serialization;

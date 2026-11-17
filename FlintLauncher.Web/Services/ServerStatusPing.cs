@@ -307,7 +307,7 @@ internal sealed record ServerStatusJson
     public ServerStatusPlayersJson? Players { get; set; }
 
     [JsonConverter(typeof(ServerStatusVersionConverter))]
-    public required ServerStatusVersionJson Version { get; set; }
+    public ServerStatusVersionJson? Version { get; set; }
 
     [JsonConverter(typeof(MotdConverter))]
     public string? Description { get; set; }
@@ -325,7 +325,7 @@ internal sealed record ServerStatusPlayersJson
 internal sealed record ServerStatusVersionJson
 {
     [JsonConverter(typeof(QtCoercingNullableStringConverter))]
-    public required string Name { get; set; }
+    public string? Name { get; set; }
 }
 
 internal sealed class ServerStatusPlayersConverter : JsonConverter<ServerStatusPlayersJson?>

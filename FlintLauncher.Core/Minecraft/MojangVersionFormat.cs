@@ -23,9 +23,7 @@
 // Port of launcher/minecraft/MojangVersionFormat.{h,cpp}.
 //
 // QJsonDocument parameters become JsonObject/JsonNode reads (single-DOM model); the
-// QObject::tr() strings are kept as literal (untranslated) format strings. The upstream typo
-// of a missing space in "<filename>contains a library that doesn't have a 'name' field" is
-// preserved.
+// QObject::tr() strings are kept as literal (untranslated) format strings.
 
 using System.Text.Json;
 using System.Text.Json.Nodes;

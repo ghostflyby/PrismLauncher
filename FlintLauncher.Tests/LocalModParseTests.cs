@@ -134,6 +134,35 @@ public class LocalModParseTests : IDisposable
         Assert.False(mod.Valid);
     }
 
+    [Fact]
+    public void Fabric_JunkOptionalMembers_DegradePerMember()
+    {
+        var jar = TempFile("fabric-junk-optional.jar");
+        WriteJar(jar, ("fabric.mod.json", """
+                                         {
+                                             "schemaVersion": 1,
+                                             "id": "junkmod",
+                                             "version": "1.0.0",
+                                             "name": "Junk Mod",
+                                             "authors": [42, null, {"name": 5}],
+                                             "license": [42, null, {"id": "MIT"}],
+                                             "icon": {"32x32": 5}
+                                         }
+                                         """));
+
+        var mod = Parsed(jar);
+
+        // the malformed optional members degrade individually instead of emptying the mod
+        Assert.True(mod.Valid);
+        Assert.Equal("junkmod", mod.Details.ModId);
+        Assert.Equal("Junk Mod", mod.Details.Name);
+        Assert.Equal(["", "", ""], mod.Details.Authors);
+        var license = Assert.Single(mod.Details.Licenses);
+        Assert.Equal("", license.Name);
+        Assert.Equal("MIT", license.Id);
+        Assert.Equal("", mod.Details.IconFile);
+    }
+
     // ------------------------------------------------------------------ quilt
 
     [Fact]
@@ -172,6 +201,28 @@ public class LocalModParseTests : IDisposable
         Assert.Equal("assets/big.png", mod.Details.IconFile);
         // minecraft/quilt_* filtered; optional entries skipped (the depends block sits on the
         // root object, exactly like the C++ reader reads it)
+        Assert.Equal(["plain_dep", "hard_dep"], mod.Details.Dependencies);
+    }
+
+    [Fact]
+    public void Quilt_JunkDependencyEntries_DegradePerEntry()
+    {
+        var jar = TempFile("quilt-junk-deps.jar");
+        WriteJar(jar, ("quilt.mod.json", """
+                                         {
+                                             "schema_version": 1,
+                                             "quilt_loader": {
+                                                 "id": "quiltmod",
+                                                 "version": "2.0.0"
+                                             },
+                                             "depends": [42, null, {"id": 5, "optional": "true"}, "plain_dep", {"id": "hard_dep"}]
+                                         }
+                                         """));
+
+        var mod = Parsed(jar);
+
+        Assert.True(mod.Valid);
+        Assert.Equal("quiltmod", mod.Details.ModId);
         Assert.Equal(["plain_dep", "hard_dep"], mod.Details.Dependencies);
     }
 

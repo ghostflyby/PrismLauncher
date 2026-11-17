@@ -460,20 +460,128 @@ internal sealed record PackMetaSectionJson
     public int PackFormat { get; set; }
 
     [JsonPropertyName("min_format")]
+    [JsonConverter(typeof(TolerantPackVersionConverter))]
     public PackVersionJson? MinFormat { get; set; }
 
     [JsonPropertyName("max_format")]
+    [JsonConverter(typeof(TolerantPackVersionConverter))]
     public PackVersionJson? MaxFormat { get; set; }
 
-    public required ChatComponentJson Description { get; set; }
+    [JsonConverter(typeof(TolerantChatComponentConverter))]
+    public ChatComponentJson? Description { get; set; }
 }
 
 /// <summary>The pack-format value: a bare major number or a [major, minor] pair.</summary>
 internal union PackVersionJson(double, List<double>);
 
+/// <summary>Number/array are the valid pack-format shapes; junk array entries coerce to 0
+/// and any other token reads absent (the former PackVersionConverter read).</summary>
+internal sealed class TolerantPackVersionConverter : JsonConverter<PackVersionJson?>
+{
+    public override PackVersionJson? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        switch (reader.TokenType)
+        {
+            case JsonTokenType.Number:
+                return (PackVersionJson)(reader.TryGetDouble(out var single) ? single : 0);
+            case JsonTokenType.StartArray:
+            {
+                var node = JsonNode.Parse(ref reader) as JsonArray;
+                var values = new List<double>();
+                if (node is not null)
+                {
+                    foreach (var element in node)
+                    {
+                        values.Add(element is JsonValue value && value.TryGetValue<double>(out var number)
+                            ? number
+                            : 0);
+                    }
+                }
+
+                return (PackVersionJson)values;
+            }
+            default:
+                return null;
+        }
+    }
+
+    public override void Write(Utf8JsonWriter writer, PackVersionJson? value, JsonSerializerOptions options) =>
+        throw new NotSupportedException("the pack.mcmeta records are read-only");
+}
+
 /// <summary>The unified raw-JSON text component value: a string, boolean, number,
 /// array of components, or component object.</summary>
 internal union ChatComponentJson(string, bool, double, List<ChatComponentJson?>, ComponentObjectJson);
+
+/// <summary>A string/bool/number/array/object is a component; any other token reads null
+/// (the former chat-component switch default).</summary>
+internal sealed class TolerantChatComponentConverter : JsonConverter<ChatComponentJson?>
+{
+    public override ChatComponentJson? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        switch (reader.TokenType)
+        {
+            case JsonTokenType.String:
+                return (ChatComponentJson)(reader.GetString() ?? "");
+            case JsonTokenType.True:
+            case JsonTokenType.False:
+                return (ChatComponentJson)(reader.TokenType == JsonTokenType.True);
+            case JsonTokenType.Number:
+                return (ChatComponentJson)(reader.TryGetDouble(out var number) ? number : 0);
+            case JsonTokenType.StartArray:
+                return (ChatComponentJson)ReadArray(ref reader);
+            case JsonTokenType.StartObject:
+            {
+                var component = JsonSerializer.Deserialize(
+                    ref reader, DataPackJsonContext.Default.ComponentObjectJson)
+                    ?? throw new JsonException("Value is not an object");
+                return (ChatComponentJson)component;
+            }
+            default:
+                return null;
+        }
+    }
+
+    internal static List<ChatComponentJson?> ReadArray(ref Utf8JsonReader reader)
+    {
+        var result = new List<ChatComponentJson?>();
+        while (reader.Read())
+        {
+            if (reader.TokenType == JsonTokenType.EndArray)
+            {
+                return result;
+            }
+
+            if (reader.TokenType == JsonTokenType.Null)
+            {
+                result.Add(null);
+                continue;
+            }
+
+            result.Add(JsonSerializer.Deserialize(ref reader, DataPackJsonContext.Default.ChatComponentJson));
+        }
+
+        throw new JsonException("unterminated array");
+    }
+
+    public override void Write(Utf8JsonWriter writer, ChatComponentJson? value, JsonSerializerOptions options) =>
+        throw new NotSupportedException("the pack.mcmeta records are read-only");
+}
+
+/// <summary>Only an array counts (the former `is JsonArray` probe); junk reads null.</summary>
+internal sealed class TolerantChatExtraConverter : JsonConverter<List<ChatComponentJson?>?>
+{
+    public override List<ChatComponentJson?>? Read(ref Utf8JsonReader reader, Type typeToConvert,
+        JsonSerializerOptions options)
+    {
+        return reader.TokenType == JsonTokenType.StartArray
+            ? TolerantChatComponentConverter.ReadArray(ref reader)
+            : null;
+    }
+
+    public override void Write(Utf8JsonWriter writer, List<ChatComponentJson?>? value,
+        JsonSerializerOptions options) => throw new NotSupportedException("the pack.mcmeta records are read-only");
+}
 
 internal sealed record ComponentObjectJson
 {
@@ -501,6 +609,7 @@ internal sealed record ComponentObjectJson
     public string Color { get; set; } = "";
 
     /// <summary>Only an array counts (the former `is JsonArray` probe); junk reads null.</summary>
+    [JsonConverter(typeof(TolerantChatExtraConverter))]
     public List<ChatComponentJson?>? Extra { get; set; }
 
     [JsonConverter(typeof(ClickEventConverter))]
@@ -515,8 +624,6 @@ internal sealed record ClickEventJson
     [JsonConverter(typeof(QtCoercingStringConverter))]
     public string Value { get; set; } = "";
 }
-
-/// <summary>A non-array extra reads null (skipped), like the former probe.</summary>
 
 /// <summary>A non-object clickEvent reads null (skipped), like the former probe.</summary>
 internal sealed class ClickEventConverter : JsonConverter<ClickEventJson?>

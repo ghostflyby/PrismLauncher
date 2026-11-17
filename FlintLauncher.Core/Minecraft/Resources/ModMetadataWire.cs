@@ -135,6 +135,156 @@ internal union FabricLicenseValue(string, FabricLicenseObject, List<FabricLicens
 /// The largest/first resolution stays in the mapper.</summary>
 internal union FabricIconJson(string, Dictionary<string, string>);
 
+internal static class ModMetadataCoercion
+{
+    public static string String(JsonObject? obj, string key) =>
+        obj is not null && obj.TryGetPropertyValue(key, out var node) &&
+        node is JsonValue value && value.TryGetValue<string>(out var s)
+            ? s
+            : "";
+
+    public static string? StringOrNull(JsonObject? obj, string key)
+    {
+        var value = String(obj, key);
+        return value.Length != 0 ? value : null;
+    }
+}
+
+/// <summary>String/map are the valid icon shapes; anything else reads absent and
+/// non-string map values coerce to "" (the former QJsonValue::toString read).</summary>
+internal sealed class TolerantFabricIconConverter : JsonConverter<FabricIconJson?>
+{
+    public override FabricIconJson? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        switch (reader.TokenType)
+        {
+            case JsonTokenType.String:
+                return (FabricIconJson)(reader.GetString() ?? "");
+            case JsonTokenType.StartObject:
+            {
+                var node = JsonNode.Parse(ref reader) as JsonObject;
+                var sizes = new Dictionary<string, string>(StringComparer.Ordinal);
+                if (node is not null)
+                {
+                    foreach (var (key, value) in node)
+                    {
+                        sizes[key] = value is JsonValue v && v.TryGetValue<string>(out var s) ? s : "";
+                    }
+                }
+
+                return (FabricIconJson)sizes;
+            }
+            default:
+                return null;
+        }
+    }
+
+    public override void Write(Utf8JsonWriter writer, FabricIconJson? value, JsonSerializerOptions options) =>
+        throw new NotSupportedException("the mod metadata records are read-only");
+}
+
+/// <summary>String/object/array are the valid license shapes; junk array elements are
+/// skipped and object fields coerce like the former node reads.</summary>
+internal sealed class TolerantFabricLicenseConverter : JsonConverter<FabricLicenseValue?>
+{
+    public override FabricLicenseValue? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        switch (reader.TokenType)
+        {
+            case JsonTokenType.String:
+                return (FabricLicenseValue)(reader.GetString() ?? "");
+            case JsonTokenType.StartObject:
+                return (FabricLicenseValue)ReadObject(ref reader);
+            case JsonTokenType.StartArray:
+            {
+                var result = new List<FabricLicenseJson>();
+                while (reader.Read())
+                {
+                    if (reader.TokenType == JsonTokenType.EndArray)
+                    {
+                        return (FabricLicenseValue)result;
+                    }
+
+                    if (reader.TokenType == JsonTokenType.String)
+                    {
+                        result.Add((FabricLicenseJson)(reader.GetString() ?? ""));
+                    }
+                    else if (reader.TokenType == JsonTokenType.StartObject)
+                    {
+                        result.Add((FabricLicenseJson)ReadObject(ref reader));
+                    }
+                }
+
+                throw new JsonException("unterminated array");
+            }
+            default:
+                return null;
+        }
+    }
+
+    private static FabricLicenseObject ReadObject(ref Utf8JsonReader reader)
+    {
+        var node = JsonNode.Parse(ref reader) as JsonObject;
+        return new FabricLicenseObject
+        {
+            Name = ModMetadataCoercion.String(node, "name"),
+            Id = ModMetadataCoercion.StringOrNull(node, "id"),
+            Url = ModMetadataCoercion.StringOrNull(node, "url"),
+            Description = ModMetadataCoercion.StringOrNull(node, "description"),
+        };
+    }
+
+    public override void Write(Utf8JsonWriter writer, FabricLicenseValue? value, JsonSerializerOptions options) =>
+        throw new NotSupportedException("the mod metadata records are read-only");
+}
+
+/// <summary>Author entries are strings or {name} objects; junk entries coerce to ""
+/// (the former StringOr semantics). A non-array member reads null.</summary>
+internal sealed class TolerantFabricAuthorsConverter : JsonConverter<List<FabricAuthorJson>?>
+{
+    public override List<FabricAuthorJson>? Read(ref Utf8JsonReader reader, Type typeToConvert,
+        JsonSerializerOptions options)
+    {
+        if (reader.TokenType is not JsonTokenType.StartArray)
+        {
+            return null;
+        }
+
+        var result = new List<FabricAuthorJson>();
+        while (reader.Read())
+        {
+            if (reader.TokenType == JsonTokenType.EndArray)
+            {
+                return result;
+            }
+
+            switch (reader.TokenType)
+            {
+                case JsonTokenType.String:
+                    result.Add((FabricAuthorJson)(reader.GetString() ?? ""));
+                    break;
+                case JsonTokenType.StartObject:
+                {
+                    var node = JsonNode.Parse(ref reader) as JsonObject;
+                    result.Add((FabricAuthorJson)new FabricAuthorObject
+                    {
+                        Name = ModMetadataCoercion.String(node, "name"),
+                    });
+                    break;
+                }
+                default:
+                    result.Add((FabricAuthorJson)"");
+                    break;
+            }
+        }
+
+        throw new JsonException("unterminated array");
+    }
+
+    public override void Write(Utf8JsonWriter writer, List<FabricAuthorJson>? value, JsonSerializerOptions options) =>
+        throw new NotSupportedException("the mod metadata records are read-only");
+}
+
 /// <summary>A JSON object read as its string-keyed raw elements (the "iterate the keys"
 /// members: fabric depends, quilt contributors); a non-object reads null.</summary>
 internal sealed class CoercingObjectElementDictionaryConverter : JsonConverter<Dictionary<string, JsonElement>?>
@@ -187,6 +337,7 @@ internal sealed record FabricModJson
     [JsonConverter(typeof(QtCoercingStringConverter))]
     public string Description { get; set; } = "";
 
+    [JsonConverter(typeof(TolerantFabricAuthorsConverter))]
     public List<FabricAuthorJson>? Authors { get; set; }
 
     /// <summary>Only an object counts (the former `is JsonObject` probe); a wrong-kind
@@ -194,16 +345,16 @@ internal sealed record FabricModJson
     [JsonConverter(typeof(FabricContactConverter))]
     public FabricContactJson? Contact { get; set; }
 
+    [JsonConverter(typeof(TolerantFabricLicenseConverter))]
     public FabricLicenseValue? License { get; set; }
 
+    [JsonConverter(typeof(TolerantFabricIconConverter))]
     public FabricIconJson? Icon { get; set; }
 
     [JsonConverter(typeof(CoercingObjectElementDictionaryConverter))]
     public Dictionary<string, JsonElement>? Depends { get; set; }
 }
 
-/// <summary>The author entries: plain strings or {name} objects; junk entries coerce to ""
-/// (the former StringOr semantics). A non-array member reads null.</summary>
 /// <summary>An author entry: a plain string or a {name} object.</summary>
 internal union FabricAuthorJson(string, FabricAuthorObject);
 
@@ -247,6 +398,7 @@ internal sealed record QuiltModJson
     [JsonPropertyName("quilt_loader")]
     public required QuiltLoaderJson QuiltLoader { get; set; }
 
+    [JsonConverter(typeof(TolerantQuiltDependsConverter))]
     public List<QuiltDependJson>? Depends { get; set; }
 }
 
@@ -279,8 +431,10 @@ internal sealed record QuiltMetadataJson
     [JsonConverter(typeof(FabricContactConverter))]
     public FabricContactJson? Contact { get; set; }
 
+    [JsonConverter(typeof(TolerantFabricLicenseConverter))]
     public FabricLicenseValue? License { get; set; }
 
+    [JsonConverter(typeof(TolerantFabricIconConverter))]
     public FabricIconJson? Icon { get; set; }
 }
 
@@ -305,6 +459,51 @@ internal sealed record QuiltDependObject
     public required string Id { get; set; }
 
     public bool? Optional { get; set; }
+}
+
+/// <summary>Dependency entries are id strings or {id, optional} objects; junk elements
+/// are dropped and junk optional flags read null (the former node reads).</summary>
+internal sealed class TolerantQuiltDependsConverter : JsonConverter<List<QuiltDependJson>?>
+{
+    public override List<QuiltDependJson>? Read(ref Utf8JsonReader reader, Type typeToConvert,
+        JsonSerializerOptions options)
+    {
+        if (reader.TokenType is not JsonTokenType.StartArray)
+        {
+            return null;
+        }
+
+        var result = new List<QuiltDependJson>();
+        while (reader.Read())
+        {
+            if (reader.TokenType == JsonTokenType.EndArray)
+            {
+                return result;
+            }
+
+            if (reader.TokenType == JsonTokenType.String)
+            {
+                result.Add((QuiltDependJson)(reader.GetString() ?? ""));
+            }
+            else if (reader.TokenType == JsonTokenType.StartObject)
+            {
+                var node = JsonNode.Parse(ref reader) as JsonObject;
+                result.Add((QuiltDependJson)new QuiltDependObject
+                {
+                    Id = ModMetadataCoercion.String(node, "id"),
+                    Optional = node is not null && node.TryGetPropertyValue("optional", out var optional) &&
+                               optional is JsonValue ov && ov.TryGetValue<bool>(out var flag)
+                        ? flag
+                        : null,
+                });
+            }
+        }
+
+        throw new JsonException("unterminated array");
+    }
+
+    public override void Write(Utf8JsonWriter writer, List<QuiltDependJson>? value, JsonSerializerOptions options) =>
+        throw new NotSupportedException("the mod metadata records are read-only");
 }
 
 // ------------------------------------------------------------------------ litemod.json

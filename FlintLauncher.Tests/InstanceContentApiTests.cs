@@ -585,6 +585,26 @@ public class ServerApiTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task Server_Ping_Tolerates_Reply_Without_Version()
+    {
+        // 1.20+ clients may omit the version object; the reply stays a successful ping
+        var statusJson = """{"players":{"online":0,"max":0},"description":"Old server"}""";
+        using var stub = new PingStubServer(BuildStatusReply(statusJson));
+
+        _host = await StartHostWithInstance();
+        await _host.PostAsync("/api/v1/instances/servers-inst/servers",
+            new { name = "Old", address = $"127.0.0.1:{stub.Port}" });
+
+        var response = await _host.Client.PostAsync(
+            "/api/v1/instances/servers-inst/servers/0/ping", content: null);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var ping = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
+        Assert.Equal(0, ping.GetProperty("onlinePlayers").GetInt32());
+        Assert.Equal("Old server", ping.GetProperty("motd").GetString());
+        Assert.True(!ping.TryGetProperty("version", out var version) || version.ValueKind == JsonValueKind.Null);
+    }
+
+    [Fact]
     public async Task Server_Ping_Failures()
     {
         _host = await StartHostWithInstance();
