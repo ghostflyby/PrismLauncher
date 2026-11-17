@@ -443,7 +443,7 @@ public static class DataPackUtils
 
 internal sealed record PackMcmetaJson
 {
-    public PackMetaSectionJson? Pack { get; set; }
+    public required PackMetaSectionJson Pack { get; set; }
 }
 
 internal sealed record PackMetaSectionJson
@@ -461,7 +461,7 @@ internal sealed record PackMetaSectionJson
     public PackVersionJson? MaxFormat { get; set; }
 
     [JsonConverter(typeof(ChatComponentConverter))]
-    public ChatComponentJson? Description { get; set; }
+    public required ChatComponentJson Description { get; set; }
 }
 
 /// <summary>The [major, minor] pack-format pair (a bare number reads [major, 0]).</summary>

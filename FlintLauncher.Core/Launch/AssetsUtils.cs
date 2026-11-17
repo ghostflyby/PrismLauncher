@@ -38,17 +38,25 @@ namespace FlintLauncher.Core.Launch;
 
 /// <summary>The on-disk assets index shape (assets/indexes/&lt;id&gt;.json): Mojang's
 /// virtual/map_to_resources flags and the object map keyed by resource path.</summary>
-public sealed record AssetsIndexFileJson(
-    bool? Virtual,
-    [property: JsonPropertyName("map_to_resources")]
-    bool? MapToResources,
-    Dictionary<string, AssetObjectJson>? Objects);
+public sealed record AssetsIndexFileJson
+{
+    public bool? Virtual { get; init; }
 
-public sealed record AssetObjectJson(
-    string? Hash,
-    long? Size);
+    [JsonPropertyName("map_to_resources")]
+    public bool? MapToResources { get; init; }
 
-[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
+    public required Dictionary<string, AssetObjectJson> Objects { get; init; }
+}
+
+public sealed record AssetObjectJson
+{
+    public required string Hash { get; init; }
+
+    public required long Size { get; init; }
+}
+
+[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
+    RespectNullableAnnotations = true)]
 [JsonSerializable(typeof(AssetsIndexFileJson))]
 internal sealed partial class AssetsJsonContext : JsonSerializerContext;
 
@@ -155,17 +163,14 @@ public static class AssetsUtils
             index.MapToResources = mapFlag;
         }
 
-        if (document.Objects is { } objects)
+        foreach (var (key, value) in document.Objects)
         {
-            foreach (var (key, value) in objects)
+            // a JSON null object entry kept its (empty) AssetObject in the former read
+            index.Objects[key] = new AssetObject
             {
-                // a JSON null object entry kept its (empty) AssetObject in the former read
-                index.Objects[key] = new AssetObject
-                {
-                    Hash = value?.Hash ?? "",
-                    Size = value?.Size ?? 0,
-                };
-            }
+                Hash = value?.Hash ?? "",
+                Size = value?.Size ?? 0,
+            };
         }
 
         return true;

@@ -24,7 +24,7 @@ namespace FlintLauncher.Core.ModPlatform.Helpers;
 /// when their OptionalData flag is on AND the value is non-empty, like the C++ conditions.</summary>
 internal sealed record ModListEntryJson
 {
-    public string Name { get; init; } = "";
+    public required string Name { get; init; }
 
     public string? Url { get; init; }
 

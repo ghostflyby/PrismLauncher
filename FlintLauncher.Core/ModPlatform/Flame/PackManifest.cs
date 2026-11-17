@@ -37,35 +37,52 @@ using TruePath.SystemIo;
 
 namespace FlintLauncher.Core.ModPlatform.Flame;
 
-/// <summary>The manifest.json wire shape (the load-side probe; optional members carry the
-/// QJsonValue defaults, required ones are validated by the loader).</summary>
-internal sealed record FlameManifestJson(
-    string? ManifestType,
-    int? ManifestVersion,
-    FlameMinecraftJson? Minecraft,
-    string? Name,
-    string? Version,
-    string? Author,
-    List<FlameFileJson>? Files,
-    string? Overrides);
+/// <summary>The manifest.json wire shape (the load-side probe; required members come from
+/// the upstream Json::require* checks, the optional ones carry the QJsonValue defaults).</summary>
+internal sealed record FlameManifestJson
+{
+    public required string ManifestType { get; init; }
 
-internal sealed record FlameMinecraftJson(
-    string? Version,
-    string? Libraries,
-    List<FlameModloaderJson>? ModLoaders,
-    int? RecommendedRam);
+    public required int ManifestVersion { get; init; }
 
-internal sealed record FlameModloaderJson(
-    string? Id,
-    bool? Primary);
+    public required FlameMinecraftJson Minecraft { get; init; }
 
-internal sealed record FlameFileJson(
-    [property: JsonPropertyName("projectID")]
-    long? ProjectId,
-    [property: JsonPropertyName("fileID")] long? FileId,
-    bool? Required);
+    public string? Name { get; init; }
+    public string? Version { get; init; }
+    public string? Author { get; init; }
+    public List<FlameFileJson>? Files { get; init; }
+    public string? Overrides { get; init; }
+}
 
-[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
+internal sealed record FlameMinecraftJson
+{
+    public required string Version { get; init; }
+
+    public string? Libraries { get; init; }
+    public List<FlameModloaderJson>? ModLoaders { get; init; }
+    public int? RecommendedRam { get; init; }
+}
+
+internal sealed record FlameModloaderJson
+{
+    public required string Id { get; init; }
+
+    public bool? Primary { get; init; }
+}
+
+internal sealed record FlameFileJson
+{
+    [JsonPropertyName("projectID")]
+    public required long ProjectId { get; init; }
+
+    [JsonPropertyName("fileID")]
+    public required long FileId { get; init; }
+
+    public bool? Required { get; init; }
+}
+
+[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
+    RespectNullableAnnotations = true)]
 [JsonSerializable(typeof(FlameManifestJson))]
 // a JsonSerializerContext of its own: the STJ source generator emits per-primitive helper
 // files named "<Context>.<Type>.g.cs", so one context class cannot be declared across two
@@ -146,29 +163,30 @@ public sealed class FlameManifest
 
     private static void LoadManifestV1(FlameManifest pack, FlameManifestJson manifest)
     {
-        pack.ManifestType = Require(manifest.ManifestType, "manifestType");
+        pack.ManifestType = manifest.ManifestType;
         if (pack.ManifestType != "minecraftModpack")
         {
             throw new JsonException("Not a modpack manifest!");
         }
 
-        pack.ManifestVersion = Require(manifest.ManifestVersion, "manifestVersion");
+        pack.ManifestVersion = manifest.ManifestVersion;
         if (pack.ManifestVersion != 1)
         {
             throw new JsonException($"Unknown manifest version ({pack.ManifestVersion})");
         }
 
-        var mc = manifest.Minecraft ?? throw new JsonException("'minecraft' is not an object");
-        pack.Minecraft.Version = Require(mc.Version, "version");
+        var mc = manifest.Minecraft;
+        pack.Minecraft.Version = mc.Version;
         // (the manifest's extra "libraries" member — a 1.2.5 FTB retro curiosity with no
         // reader anywhere — is ignored on the read)
         if (mc.ModLoaders is { } loaders)
         {
-            foreach (var loader in loaders)
+            foreach (var rawLoader in loaders)
             {
+                var loader = rawLoader ?? throw new JsonException("Value is not an object");
                 pack.Minecraft.ModLoaders.Add(new FlameModloader
                 {
-                    Id = Require(loader.Id, "id"),
+                    Id = loader.Id,
                     Primary = loader.Primary ?? false,
                 });
             }
@@ -182,12 +200,13 @@ public sealed class FlameManifest
 
         if (manifest.Files is { } files)
         {
-            foreach (var file in files)
+            foreach (var rawFile in files)
             {
+                var file = rawFile ?? throw new JsonException("Value is not an object");
                 var flameFile = new FlameFile
                 {
-                    ProjectId = Require(file.ProjectId, "projectID"),
-                    FileId = Require(file.FileId, "fileID"),
+                    ProjectId = file.ProjectId,
+                    FileId = file.FileId,
                     Required = file.Required ?? true,
                 };
                 pack.Files[flameFile.FileId] = flameFile;
@@ -198,13 +217,4 @@ public sealed class FlameManifest
 
         pack.IsLoaded = true;
     }
-
-    // ------------------------------------------------- required-member checks
-
-    private static string Require(string? value, string key) =>
-        value ?? throw new JsonException("'" + key + "' is not a string");
-
-    private static T Require<T>(T? value, string key) where T : struct =>
-        value ?? throw new JsonException(
-            "'" + key + "' is not a " + (typeof(T) == typeof(int) ? "integer" : typeof(T).Name.ToLowerInvariant()));
 }

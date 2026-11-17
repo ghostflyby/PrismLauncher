@@ -187,9 +187,9 @@ public sealed class AccountData
         return wire;
     }
 
-    /// <summary>Port of resumeStateFromV3(): false when the account cannot be parsed (the
-    /// type member is missing or unrecognized). Structural wrong-kind members never get
-    /// here — they fail the wire deserialization, where AccountList skips the account.</summary>
+    /// <summary>Port of resumeStateFromV3(): false when the type member is unrecognized.
+    /// Missing or wrong-kind mandatory members never get here — they fail the wire
+    /// deserialization, where AccountList skips the account.</summary>
     public bool ResumeStateFromV3(AccountJson wire)
     {
         switch (wire.Type)
@@ -395,8 +395,9 @@ public sealed class AccountData
     }
 
     /// <summary>The wire profile → ledger (the C++ ProfileFromJsonv3): the mandatory
-    /// id/name/skin trio, optional textures data (lenient base64), the cape list and the
-    /// current-cape reference check. A broken member yields the empty profile.</summary>
+    /// id/name/skin trio (enforced by the wire), optional textures data (lenient base64),
+    /// the cape list and the current-cape reference check. A null profile or an empty
+    /// mandated id/name yields the empty profile.</summary>
     internal static MinecraftProfile ProfileFromWire(ProfileJson? wire)
     {
         var profile = new MinecraftProfile();
@@ -411,12 +412,7 @@ public sealed class AccountData
             return new MinecraftProfile();
         }
 
-        if (wire.Skin is not { } skin || skin.Id is null || skin.Url is null || skin.Variant is null)
-        {
-            // qWarning() << "skin is missing / mandatory skin attributes are missing";
-            return new MinecraftProfile();
-        }
-
+        var skin = wire.Skin;
         profile.Name = wire.Name;
         profile.Id = wire.Id;
         profile.SkinField.Id = skin.Id;
@@ -429,9 +425,9 @@ public sealed class AccountData
 
         foreach (var capeWire in wire.Capes ?? [])
         {
-            if (capeWire.Id is null || capeWire.Url is null || capeWire.Alias is null)
+            if (capeWire is null)
             {
-                // qWarning() << "cape is not an object / mandatory attributes are missing";
+                // qWarning() << "cape is not an object";
                 return new MinecraftProfile();
             }
 
@@ -460,16 +456,16 @@ public sealed class AccountData
     }
 
     /// <summary>The wire entitlement → ledger (the C++ EntitlementFromJsonv3): false when
-    /// the object is absent or either boolean is missing.</summary>
+    /// the object is absent; both booleans are required by the wire shape.</summary>
     internal static bool EntitlementFromWire(EntitlementJson? wire, MinecraftEntitlement outEntitlement)
     {
-        if (wire is null || wire.OwnsMinecraft is not { } owns || wire.CanPlayMinecraft is not { } canPlay)
+        if (wire is null)
         {
             return false;
         }
 
-        outEntitlement.CanPlayMinecraft = canPlay;
-        outEntitlement.OwnsMinecraft = owns;
+        outEntitlement.CanPlayMinecraft = wire.CanPlayMinecraft;
+        outEntitlement.OwnsMinecraft = wire.OwnsMinecraft;
         outEntitlement.Validity = Validity.Assumed;
         return true;
     }

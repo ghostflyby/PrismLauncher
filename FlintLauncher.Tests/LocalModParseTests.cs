@@ -111,7 +111,7 @@ public class LocalModParseTests : IDisposable
     public void Fabric_SchemaVersionZero_SkipsTheOptionalBlock()
     {
         var jar = TempFile("noschema.jar");
-        WriteJar(jar, ("fabric.mod.json", """{ "id": "oldschool", "version": "0.0.1" }"""));
+        WriteJar(jar, ("fabric.mod.json", """{ "schemaVersion": 0, "id": "oldschool", "version": "0.0.1" }"""));
 
         var mod = Parsed(jar);
 

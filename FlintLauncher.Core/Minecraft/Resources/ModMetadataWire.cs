@@ -310,14 +310,14 @@ internal sealed class CoercingObjectElementDictionaryConverter : JsonConverter<D
 internal sealed record FabricModJson
 {
     [JsonConverter(typeof(QtCoercingIntConverter))]
-    public int SchemaVersion { get; set; }
+    public required int SchemaVersion { get; set; }
 
     [JsonPropertyName("id")]
     [JsonConverter(typeof(QtCoercingStringConverter))]
-    public string Id { get; set; } = "";
+    public required string Id { get; set; }
 
     [JsonConverter(typeof(QtCoercingStringConverter))]
-    public string Version { get; set; } = "";
+    public required string Version { get; set; }
 
     /// <summary>Absent-or-junk falls back to the mod id (the spec default).</summary>
     [JsonConverter(typeof(QtCoercingNullableStringConverter))]
@@ -415,10 +415,10 @@ internal sealed record QuiltModJson
 {
     [JsonPropertyName("schema_version")]
     [JsonConverter(typeof(QtCoercingIntConverter))]
-    public int SchemaVersion { get; set; }
+    public required int SchemaVersion { get; set; }
 
     [JsonPropertyName("quilt_loader")]
-    public QuiltLoaderJson? QuiltLoader { get; set; }
+    public required QuiltLoaderJson QuiltLoader { get; set; }
 
     [JsonConverter(typeof(QuiltDependsConverter))]
     public List<QuiltDependJson>? Depends { get; set; }
@@ -427,10 +427,10 @@ internal sealed record QuiltModJson
 internal sealed record QuiltLoaderJson
 {
     [JsonConverter(typeof(QtCoercingStringConverter))]
-    public string Id { get; set; } = "";
+    public required string Id { get; set; }
 
     [JsonConverter(typeof(QtCoercingStringConverter))]
-    public string Version { get; set; } = "";
+    public required string Version { get; set; }
 
     /// <summary>A non-object metadata member reads null (the former `as JsonObject ?? []`
     /// probe) so a broken member cannot empty the whole mod.</summary>
@@ -475,7 +475,7 @@ internal sealed class QuiltMetadataConverter : JsonConverter<QuiltMetadataJson?>
 
 internal sealed record QuiltDependJson
 {
-    public string? Id { get; set; }
+    public required string Id { get; set; }
 
     public bool? Optional { get; set; }
 }
@@ -508,7 +508,8 @@ internal sealed class QuiltDependsConverter : JsonConverter<List<QuiltDependJson
                 var node = JsonNode.Parse(ref reader) as JsonObject;
                 result.Add(new QuiltDependJson
                 {
-                    Id = FabricLicenseListConverter.StringOrNull(node, "id"),
+                    Id = FabricLicenseListConverter.StringOrNull(node, "id")
+                         ?? throw new JsonException("'id' is not a string"),
                     Optional = node is not null && node.TryGetPropertyValue("optional", out var optional) &&
                                optional is JsonValue ov && ov.TryGetValue<bool>(out var flag)
                         ? flag

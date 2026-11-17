@@ -24,26 +24,40 @@ using JdkFind;
 
 namespace FlintLauncher.Core.Minecraft;
 
-internal sealed record MojangDownloadInfoJson(
-    string? Path,
-    string? Sha1,
-    string? Url,
-    int? Size);
+internal sealed record MojangDownloadInfoJson
+{
+    public string? Path { get; init; }
 
-internal sealed record MojangAssetIndexJson(
-    string? Path,
-    string? Sha1,
-    string? Url,
-    int? Size,
-    int? TotalSize,
-    string? Id);
+    public required string Sha1 { get; init; }
+
+    public required string Url { get; init; }
+
+    public required int Size { get; init; }
+}
+
+internal sealed record MojangAssetIndexJson
+{
+    public string? Path { get; init; }
+
+    public required string Sha1 { get; init; }
+
+    public required string Url { get; init; }
+
+    public required int Size { get; init; }
+
+    public required int TotalSize { get; init; }
+
+    public required string Id { get; init; }
+}
 
 internal sealed record MojangLibraryDownloadsJson(
     MojangDownloadInfoJson? Artifact,
     Dictionary<string, MojangDownloadInfoJson>? Classifiers);
 
-internal sealed record LibraryExtractJson(
-    List<string>? Exclude);
+internal sealed record LibraryExtractJson
+{
+    public required List<string> Exclude { get; init; }
+}
 
 internal sealed record RuleJson(
     JsonElement? Action,
@@ -51,7 +65,7 @@ internal sealed record RuleJson(
 
 internal sealed record LibraryJson
 {
-    public string? Name { get; init; }
+    public required string Name { get; init; }
     public string? Url { get; init; }
     public LibraryExtractJson? Extract { get; init; }
 
@@ -82,9 +96,12 @@ internal sealed record LibraryJson
 }
 
 /// <summary>The DEPRECATED '+jarMods' entry shape.</summary>
-internal sealed record PlusJarModJson(
-    string? Name,
-    string? OriginalName);
+internal sealed record PlusJarModJson
+{
+    public required string Name { get; init; }
+
+    public string? OriginalName { get; init; }
+}
 
 internal sealed record JavaChecksumJson(
     string? Hash,
@@ -195,33 +212,33 @@ internal sealed record VersionFileJson
 
 // ---------------------------------------------------------------------------
 // the WRITE records (model → wire). Separate from the read probes: the write side is
-// strongly typed (non-null members are the always-written ones), a null member is simply
+// strongly typed (required members are the always-written ones), a null member is simply
 // not written (WhenWritingNull), matching the former conditional JsonObject inserts.
 
 internal sealed record DownloadInfoOutJson
 {
     public string? Path { get; init; }
 
-    public string Sha1 { get; init; } = "";
+    public required string Sha1 { get; init; }
 
-    public int Size { get; init; }
+    public required int Size { get; init; }
 
-    public string Url { get; init; } = "";
+    public required string Url { get; init; }
 }
 
 internal sealed record AssetIndexOutJson
 {
     public string? Path { get; init; }
 
-    public string Sha1 { get; init; } = "";
+    public required string Sha1 { get; init; }
 
-    public int Size { get; init; }
+    public required int Size { get; init; }
 
-    public string Url { get; init; } = "";
+    public required string Url { get; init; }
 
-    public int TotalSize { get; init; }
+    public required int TotalSize { get; init; }
 
-    public string Id { get; init; } = "";
+    public required string Id { get; init; }
 }
 
 internal sealed record LibDownloadsOutJson
@@ -233,7 +250,7 @@ internal sealed record LibDownloadsOutJson
 
 internal sealed record RuleOsOutJson
 {
-    public string Name { get; init; } = "";
+    public required string Name { get; init; }
 
     public string? Version { get; init; }
 }
@@ -248,7 +265,7 @@ internal sealed record RuleOutJson
 
 internal sealed record LibraryOutJson
 {
-    public string Name { get; init; } = "";
+    public required string Name { get; init; }
 
     public string? Url { get; init; }
 
@@ -361,24 +378,11 @@ internal sealed record VersionFileOutJson
 // deserialize/serialize roots need explicit registration)
 internal sealed partial class VersionFormatJsonContext : JsonSerializerContext;
 
-/// <summary>The mappers from the version-format probes onto the domain objects. All shared
-/// helpers throw the collapsed JsonException kind texts — a malformed document fails
-/// whole (the reasonable failure behavior for format files; the consumers surface the
-/// message and the file can be fixed or refetched).</summary>
+/// <summary>The mappers from the version-format probes onto the domain objects. The
+/// required members are enforced by the wire; collection elements still need the
+/// RequireElement guard because STJ does not enforce element nullability.</summary>
 internal static class VersionFormatMapper
 {
-    public static JsonException MissingInt(string key) => new($"'{key}' is not an integer");
-
-    public static JsonException MissingString(string key) => new($"'{key}' is not a string");
-
-    public static JsonException MissingObject(string key) => new($"'{key}' is not an object");
-
-    public static string Require(string? value, string key) => value ?? throw MissingString(key);
-
-    public static int Require(int? value, string key) => value ?? throw MissingInt(key);
-
-    public static JsonException MissingArray(string key) => new($"'{key}' is not an array");
-
     /// <summary>Collection/dictionary elements are not null-checked by STJ (even with
     /// RespectNullableAnnotations) — a JSON null element is the former "Value is not an
     /// object" binding failure.</summary>
@@ -400,9 +404,9 @@ internal static class VersionFormatMapper
             info.Path = dto.Path;
         }
 
-        info.Sha1 = Require(dto.Sha1, "sha1");
-        info.Url = Require(dto.Url, "url");
-        info.Size = Require(dto.Size, "size");
+        info.Sha1 = dto.Sha1;
+        info.Url = dto.Url;
+        info.Size = dto.Size;
         return info;
     }
 
@@ -410,17 +414,17 @@ internal static class VersionFormatMapper
     {
         var info = new MojangAssetIndexInfo
         {
-            TotalSize = Require(dto.TotalSize, "totalSize"),
-            Id = Require(dto.Id, "id"),
+            TotalSize = dto.TotalSize,
+            Id = dto.Id,
         };
         if (dto.Path is not null)
         {
             info.Path = dto.Path;
         }
 
-        info.Sha1 = Require(dto.Sha1, "sha1");
-        info.Url = Require(dto.Url, "url");
-        info.Size = Require(dto.Size, "size");
+        info.Sha1 = dto.Sha1;
+        info.Url = dto.Url;
+        info.Size = dto.Size;
         return info;
     }
 
@@ -485,12 +489,6 @@ internal static class VersionFormatMapper
             throw new JsonException("Value is not an object");
         }
 
-        if (dto.Name is null)
-        {
-            // the upstream typo of the missing space is preserved
-            throw new JsonException(filename + "contains a library that doesn't have a 'name' field");
-        }
-
         var outLib = new Library();
         var rawName = dto.Name;
         outLib.Name = new GradleSpecifier(rawName);
@@ -507,14 +505,7 @@ internal static class VersionFormatMapper
         if (dto.Extract is { } extract)
         {
             outLib.HasExcludes = true;
-            if (extract.Exclude is { } excludes)
-            {
-                outLib.ExtractExcludes.AddRange(excludes);
-            }
-            else
-            {
-                throw MissingArray("exclude");
-            }
+            outLib.ExtractExcludes.AddRange(extract.Exclude);
         }
 
         if (dto.Natives is { } natives)
@@ -574,16 +565,11 @@ internal static class VersionFormatMapper
         }
     }
 
-    public static PlusJarModParts MapPlusJarMod(PlusJarModJson? dto, string filename, string originalName)
+    public static PlusJarModParts MapPlusJarMod(PlusJarModJson? dto, string originalName)
     {
         if (dto is null)
         {
             throw new JsonException("Value is not an object");
-        }
-
-        if (dto.Name is null)
-        {
-            throw new JsonException(filename + "contains a jarmod that doesn't have a 'name' field");
         }
 
         // it needs to be local, it is stored in the instance jarmods folder; the display

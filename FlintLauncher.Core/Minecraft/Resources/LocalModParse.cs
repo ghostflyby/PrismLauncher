@@ -549,7 +549,12 @@ public static class ModUtils
             wire = null;
         }
 
-        var fabric = wire ?? new FabricModJson();
+        if (wire is null)
+        {
+            return new ModDetails();
+        }
+
+        var fabric = wire;
         var details = new ModDetails
         {
             ModId = fabric.Id,

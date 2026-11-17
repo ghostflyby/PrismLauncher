@@ -87,58 +87,85 @@ public sealed class Require : IEquatable<Require>, IComparable<Require>
 
 /// <summary>The index/version-list shapes as parsed DTOs. formatVersion stays a raw element
 /// so the "any JSON number token" input compatibility of the former EnsureDouble read is
-/// preserved (a quoted "1" is NOT a format version); the required strings are validated by
-/// the mappers with document-level failures.</summary>
-internal sealed record MetaIndexJson(
-    JsonElement? FormatVersion,
-    List<MetaPackageJson>? Packages);
+/// preserved (a quoted "1" is NOT a format version); the required members are enforced by
+/// the wire and the collection elements by the parsers.</summary>
+internal sealed record MetaIndexJson
+{
+    public required JsonElement? FormatVersion { get; init; }
 
-internal sealed record MetaPackageJson(
-    string? Uid,
-    string? Name,
-    string? Sha256);
+    public required List<MetaPackageJson?> Packages { get; init; }
+}
 
-internal sealed record MetaVersionListJson(
-    JsonElement? FormatVersion,
-    string? Uid,
-    string? Name,
-    List<MetaVersionEntryJson>? Versions);
+internal sealed record MetaPackageJson
+{
+    public required string Uid { get; init; }
 
-internal sealed record MetaVersionEntryJson(
-    string? Version,
-    string? ReleaseTime,
-    string? Type,
-    bool? Recommended,
-    bool? Volatile,
-    List<MetaRequireJson?>? Requires,
-    List<MetaRequireJson?>? Conflicts,
-    string? Sha256);
+    public string? Name { get; init; }
+    public string? Sha256 { get; init; }
+}
+
+internal sealed record MetaVersionListJson
+{
+    public required JsonElement? FormatVersion { get; init; }
+
+    public required string Uid { get; init; }
+
+    public string? Name { get; init; }
+
+    public required List<MetaVersionEntryJson?> Versions { get; init; }
+}
+
+internal sealed record MetaVersionEntryJson
+{
+    public required string Version { get; init; }
+
+    public required string ReleaseTime { get; init; }
+
+    public string? Type { get; init; }
+    public bool? Recommended { get; init; }
+    public bool? Volatile { get; init; }
+    public List<MetaRequireJson?>? Requires { get; init; }
+    public List<MetaRequireJson?>? Conflicts { get; init; }
+    public string? Sha256 { get; init; }
+}
 
 /// <summary>The ONE requires wire — shared by the meta documents, the OneSix version
 /// format and the mmc-pack components. equals/suggests coerce (a junk member reads as
-/// absent, like the former Str read); uid is enforced by the parsers.</summary>
-internal sealed record MetaRequireJson(
-    string? Uid,
-    [property: JsonPropertyName("equals"), JsonConverter(typeof(QtCoercingNullableStringConverter))]
-    string? EqualsVersion,
-    [property: JsonConverter(typeof(QtCoercingNullableStringConverter))]
-    string? Suggests);
+/// absent, like the former Str read); uid is required.</summary>
+internal sealed record MetaRequireJson
+{
+    public required string Uid { get; init; }
+
+    [JsonPropertyName("equals")]
+    [JsonConverter(typeof(QtCoercingNullableStringConverter))]
+    public string? EqualsVersion { get; init; }
+
+    [JsonConverter(typeof(QtCoercingNullableStringConverter))]
+    public string? Suggests { get; init; }
+}
 
 /// <summary>The version DOCUMENT header (uid + the common version members); the OneSix
 /// body keys are read by OneSixVersionFormat over the same node.</summary>
-internal sealed record MetaVersionDocumentJson(
-    JsonElement? FormatVersion,
-    string? Uid,
-    string? Version,
-    string? ReleaseTime,
-    string? Type,
-    bool? Recommended,
-    bool? Volatile,
-    List<MetaRequireJson?>? Requires,
-    List<MetaRequireJson?>? Conflicts,
-    string? Sha256);
+internal sealed record MetaVersionDocumentJson
+{
+    public required JsonElement? FormatVersion { get; init; }
 
-[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
+    public required string Uid { get; init; }
+
+    public required string Version { get; init; }
+
+    public required string ReleaseTime { get; init; }
+
+    public string? Type { get; init; }
+    public bool? Recommended { get; init; }
+    public bool? Volatile { get; init; }
+    public List<MetaRequireJson?>? Requires { get; init; }
+    public List<MetaRequireJson?>? Conflicts { get; init; }
+    public string? Sha256 { get; init; }
+}
+
+[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
+    RespectNullableAnnotations = true)]
 [JsonSerializable(typeof(MetaIndexJson))]
 [JsonSerializable(typeof(MetaVersionListJson))]
 [JsonSerializable(typeof(MetaVersionDocumentJson))]
@@ -171,11 +198,6 @@ public static class MetaJsonFormat
     private static string RequireStringOf(string? value, string key) =>
         value ?? throw new MetaParseException("'" + key + "' is not a string");
 
-    /// <summary>A member the document schema requires (absent or explicit null fails the
-    /// document — the reasonable failure behavior of the typed readers).</summary>
-    private static MetaParseException MissingMember(string key) =>
-        new($"The metadata document has no '{key}' member.");
-
     /// <summary>QJsonObject::contains(key) equivalent: true even when the member holds JSON null.</summary>
     private static bool Has(JsonNode? node, string key) => node is JsonObject obj && obj.ContainsKey(key);
 
@@ -183,16 +205,15 @@ public static class MetaJsonFormat
 
     private static Index ParseIndexInternal(MetaIndexJson dto)
     {
-        var packages = dto.Packages ?? throw MissingMember("packages");
-        var lists = new List<VersionList>(packages.Count);
-        foreach (var element in packages)
+        var lists = new List<VersionList>(dto.Packages.Count);
+        foreach (var element in dto.Packages)
         {
             if (element is null)
             {
                 throw new MetaParseException("Document is not an object");
             }
 
-            var list = new VersionList(RequireStringOf(element.Uid, "uid"))
+            var list = new VersionList(element.Uid)
             {
                 Name = element.Name ?? "",
                 Sha256 = element.Sha256 ?? "",
@@ -210,9 +231,17 @@ public static class MetaJsonFormat
 
     private static MetaVersion ParseVersionInternal(JsonObject obj, MetaVersionDocumentJson dto)
     {
-        var version = MapCommonVersion(RequireStringOf(dto.Uid, "uid"), new MetaVersionEntryJson(
-            dto.Version, dto.ReleaseTime, dto.Type, dto.Recommended, dto.Volatile,
-            dto.Requires, dto.Conflicts, dto.Sha256));
+        var version = MapCommonVersion(dto.Uid, new MetaVersionEntryJson
+        {
+            Version = dto.Version,
+            ReleaseTime = dto.ReleaseTime,
+            Type = dto.Type,
+            Recommended = dto.Recommended,
+            Volatile = dto.Volatile,
+            Requires = dto.Requires,
+            Conflicts = dto.Conflicts,
+            Sha256 = dto.Sha256,
+        });
 
         version.Data = OneSixVersionFormat.VersionFileFromJson(
             obj,
@@ -225,10 +254,10 @@ public static class MetaJsonFormat
 
     private static MetaVersion MapCommonVersion(string uid, MetaVersionEntryJson dto)
     {
-        var version = new MetaVersion(uid, RequireStringOf(dto.Version, "version"));
+        var version = new MetaVersion(uid, dto.Version);
         // QDateTime::fromString(..., Qt::ISODate).toMSecsSinceEpoch() / 1000; an invalid
         // QDateTime contributes 0
-        var releaseTime = ParseUtils.TimeFromS3Time(RequireStringOf(dto.ReleaseTime, "releaseTime"));
+        var releaseTime = ParseUtils.TimeFromS3Time(dto.ReleaseTime);
         version.RawTime = releaseTime?.ToUnixTimeMilliseconds() / 1000 ?? 0;
         version.Type = dto.Type;
         version.IsRecommended = dto.Recommended ?? false;
@@ -271,11 +300,10 @@ public static class MetaJsonFormat
 
     private static VersionList ParseVersionListInternal(MetaVersionListJson dto)
     {
-        var uid = RequireStringOf(dto.Uid, "uid");
+        var uid = dto.Uid;
 
-        var versionsRaw = dto.Versions ?? throw MissingMember("versions");
-        var versions = new List<MetaVersion>(versionsRaw.Count);
-        foreach (var entry in versionsRaw)
+        var versions = new List<MetaVersion>(dto.Versions.Count);
+        foreach (var entry in dto.Versions)
         {
             if (entry is null)
             {

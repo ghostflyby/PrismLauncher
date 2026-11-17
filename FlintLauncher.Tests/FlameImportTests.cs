@@ -407,7 +407,7 @@ public class FlameImportTests : IDisposable
         var staging = TempPath("staging-bad-manifest");
         Directory.CreateDirectory(staging);
         await File.WriteAllTextAsync(Path.Combine(staging, "manifest.json"),
-            """{"manifestType":"minecraftModpack","manifestVersion":9}""");
+            """{"manifestType":"minecraftModpack","manifestVersion":9,"minecraft":{"version":"1.18.2"}}""");
 
         var task = new FlameCreationTask(new AbsolutePath(staging), trustedSource: true, _global, _modrinth, _http, flame: _flameApi);
         task.SetName("Bad Manifest");

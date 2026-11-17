@@ -5,14 +5,15 @@
 // the typed probe records over the format AccountData::saveState/resumeStateFromV3 speak.
 //
 // Read compatibility (files written by upstream Prism land here verbatim through the
-// migration): every member is nullable and the semantic rules of the C++ read (the
-// mandatory profile attributes, the entitlement fallback, the legacy "offline" ygg token,
-// the lenient base64) live in the AccountData mappers. Only formatVersion needs a custom
-// converter — the C++ read it as QVariant::toInt, which also accepts digit strings.
-// A structurally wrong-kind member (e.g. a profile that is not an object) fails the
-// DESERIALIZATION of that account; AccountList skips the account and keeps loading the
-// rest — the more reasonable failure behavior (the C++ half-loaded such accounts with
-// silently empty members).
+// migration): optional members stay nullable; the members the write shape always carries
+// (account type, profile id/name/skin, cape id/url/alias, the entitlement flags) are
+// required. The semantic rules of the C++ read (the legacy "offline" ygg token, the
+// lenient base64, the current-cape check) live in the AccountData mappers. Only
+// formatVersion needs a custom converter — the C++ read it as QVariant::toInt, which
+// also accepts digit strings. A structurally wrong-kind or missing mandatory member
+// fails the DESERIALIZATION of that account; AccountList skips the account and keeps
+// loading the rest — the more reasonable failure behavior (the C++ half-loaded such
+// accounts with silently empty members).
 //
 // Write shape is free: the context writes standard indented JSON with null members
 // omitted (the former Qt sorted-keys + 4-space-indent tail has no external consumer;
@@ -41,7 +42,7 @@ public sealed record AccountFileJson
 public sealed record AccountJson
 {
     /// <summary>"MSA" or "Offline"; anything else rejects the account (resumeStateFromV3).</summary>
-    public string? Type { get; init; }
+    public required string Type { get; init; }
 
     [JsonPropertyName("msa-client-id")]
     public string? MsaClientId { get; init; }
@@ -81,21 +82,21 @@ public sealed record TokenJson
 /// the mandatory id/name/skin trio, like resumeStateFromV3 did.</summary>
 public sealed record ProfileJson
 {
-    public string? Id { get; init; }
-    public string? Name { get; init; }
+    public required string Id { get; init; }
+    public required string Name { get; init; }
 
     /// <summary>The current cape id; only sticks when it names a cape of the cape list.</summary>
     public string? Cape { get; init; }
 
-    public SkinJson? Skin { get; init; }
+    public required SkinJson Skin { get; init; }
     public CapeJson[]? Capes { get; init; }
 }
 
 public sealed record SkinJson
 {
-    public string? Id { get; init; }
-    public string? Url { get; init; }
-    public string? Variant { get; init; }
+    public required string Id { get; init; }
+    public required string Url { get; init; }
+    public required string Variant { get; init; }
 
     /// <summary>Optional; base64 with Qt's lenient decode (invalid chars skipped).</summary>
     public string? Data { get; init; }
@@ -103,9 +104,9 @@ public sealed record SkinJson
 
 public sealed record CapeJson
 {
-    public string? Id { get; init; }
-    public string? Url { get; init; }
-    public string? Alias { get; init; }
+    public required string Id { get; init; }
+    public required string Url { get; init; }
+    public required string Alias { get; init; }
 
     public string? Data { get; init; }
 }
@@ -114,9 +115,9 @@ public sealed record CapeJson
 /// count (the C++ read), otherwise the profile-validity fallback applies.</summary>
 public sealed record EntitlementJson
 {
-    public bool? OwnsMinecraft { get; init; }
+    public required bool OwnsMinecraft { get; init; }
 
-    public bool? CanPlayMinecraft { get; init; }
+    public required bool CanPlayMinecraft { get; init; }
 }
 
 /// <summary>QVariant::toInt over the formatVersion value (numbers and digit strings);
@@ -145,7 +146,8 @@ public sealed class LenientFormatVersionConverter : JsonConverter<int>
 /// naming policy is the wire's camelCase; the kebab-case members carry explicit names.</summary>
 [JsonSourceGenerationOptions(WriteIndented = true,
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
-    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
+    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+    RespectNullableAnnotations = true)]
 [JsonSerializable(typeof(JsonElement))]
 [JsonSerializable(typeof(AccountFileJson))]
 [JsonSerializable(typeof(AccountJson))]

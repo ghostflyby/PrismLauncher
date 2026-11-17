@@ -164,7 +164,7 @@ public static partial class OneSixVersionFormat
         {
             foreach (var entry in plusJarMods)
             {
-                var parts = VersionFormatMapper.MapPlusJarMod(entry, filename, outInfo.Name);
+                var parts = VersionFormatMapper.MapPlusJarMod(entry, outInfo.Name);
                 // just make up something unique on the spot for the library name.
                 var lib = new Library
                 {
@@ -392,7 +392,7 @@ public static partial class OneSixVersionFormat
         string originalName)
     {
         var dto = Probe(libObj, filename, VersionFormatJsonContext.Default.PlusJarModJson);
-        var parts = VersionFormatMapper.MapPlusJarMod(dto, filename, originalName);
+        var parts = VersionFormatMapper.MapPlusJarMod(dto, originalName);
 
         // just make up something unique on the spot for the library name.
         var outLib = new Library

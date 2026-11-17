@@ -118,18 +118,23 @@ public class MetaJsonFormatTests
     [Fact]
     public void ParseVersion_RequiredFieldErrors_FailTheDocument()
     {
-        // the typed header reader collapses a missing required member onto the require text
+        // the required members fail the typed document binding
         var missingUid = (JsonObject)Parse("""{"formatVersion":1,"releaseTime":"2017-06-02T09:59:14+00:00"}""");
-        Assert.Equal("'uid' is not a string",
+        Assert.StartsWith("The metadata version document is malformed:",
             Assert.Throws<MetaParseException>(() => MetaJsonFormat.ParseVersion(missingUid, new MetaVersion("x", "y"))).Message);
 
         var missingVersion = (JsonObject)Parse("""{"formatVersion":1,"uid":"net.minecraft"}""");
-        Assert.Equal("'version' is not a string",
+        Assert.StartsWith("The metadata version document is malformed:",
             Assert.Throws<MetaParseException>(() => MetaJsonFormat.ParseVersion(missingVersion, new MetaVersion("x", "y"))).Message);
 
         var missingReleaseTime = (JsonObject)Parse("""{"formatVersion":1,"uid":"net.minecraft","version":"1.12.2"}""");
-        Assert.Equal("'releaseTime' is not a string",
+        Assert.StartsWith("The metadata version document is malformed:",
             Assert.Throws<MetaParseException>(() => MetaJsonFormat.ParseVersion(missingReleaseTime, new MetaVersion("x", "y"))).Message);
+
+        var missingFormatVersion =
+            (JsonObject)Parse("""{"uid":"net.minecraft","version":"1.12.2","releaseTime":"2017-06-02T09:59:14+00:00"}""");
+        Assert.StartsWith("The metadata version document is malformed:",
+            Assert.Throws<MetaParseException>(() => MetaJsonFormat.ParseVersion(missingFormatVersion, new MetaVersion("x", "y"))).Message);
     }
 
     [Fact]
@@ -146,8 +151,8 @@ public class MetaJsonFormatTests
     }
 
     [Theory]
-    [InlineData("""{"uid":"u"}""")]
-    [InlineData("""{"formatVersion":2,"uid":"u"}""")]
+    [InlineData("""{"formatVersion":2,"uid":"u","version":"1","releaseTime":"2017-06-02T09:59:14+00:00"}""")]
+    [InlineData("""{"formatVersion":"1","uid":"u","version":"1","releaseTime":"2017-06-02T09:59:14+00:00"}""")]
     public void ParseVersion_RejectsUnknownFormatVersion(string json)
     {
         var e = Assert.Throws<MetaParseException>(() => ParseAndDiscard(json));
@@ -163,8 +168,8 @@ public class MetaJsonFormatTests
         // former SerializeRequires node helper is gone with the node reads
         var original = new List<MetaRequireJson?>
         {
-            new("org.lwjgl3", "3.2.2", null),
-            new("net.fabricmc.intermediary", null, "1.18"),
+            new MetaRequireJson { Uid = "org.lwjgl3", EqualsVersion = "3.2.2" },
+            new MetaRequireJson { Uid = "net.fabricmc.intermediary", Suggests = "1.18" },
         };
         var parsed = new SortedSet<Require>();
         MetaJsonFormat.ParseRequires(original, parsed);
@@ -187,7 +192,7 @@ public class MetaJsonFormatTests
 
         Assert.Equal("'requires' entry has no 'uid' string",
             Assert.Throws<JsonException>(() =>
-                MetaJsonFormat.ParseRequires([new MetaRequireJson(null, null, null)], parsed)).Message);
+                MetaJsonFormat.ParseRequires([null], parsed)).Message);
         Assert.Equal("'conflicts' entry has no 'uid' string",
             Assert.Throws<JsonException>(() =>
                 MetaJsonFormat.ParseRequires([null], parsed, "conflicts")).Message);
@@ -226,7 +231,7 @@ public class MetaJsonFormatTests
 
         // missing member
         var noPackages = (JsonObject)Parse("""{"formatVersion":1}""");
-        Assert.Equal("The metadata document has no 'packages' member.",
+        Assert.StartsWith("The metadata index document is malformed:",
             Assert.Throws<MetaParseException>(() => MetaJsonFormat.ParseIndex(noPackages, index)).Message);
 
         // a non-array / wrong-kind member fails the binding
@@ -240,7 +245,7 @@ public class MetaJsonFormatTests
 
         // an entry without its required uid fails the entry
         var missingUid = (JsonObject)Parse("""{"formatVersion":1,"packages":[{}]}""");
-        Assert.Equal("'uid' is not a string",
+        Assert.StartsWith("The metadata index document is malformed:",
             Assert.Throws<MetaParseException>(() => MetaJsonFormat.ParseIndex(missingUid, index)).Message);
 
         // unknown format version is a MetaParseException
@@ -282,7 +287,7 @@ public class MetaJsonFormatTests
     {
         var list = new VersionList("net.minecraft");
         var obj = (JsonObject)Parse("""{"formatVersion":1,"uid":"net.minecraft"}""");
-        Assert.Equal("The metadata document has no 'versions' member.",
+        Assert.StartsWith("The metadata version list document is malformed:",
             Assert.Throws<MetaParseException>(() => MetaJsonFormat.ParseVersionList(obj, list)).Message);
     }
 }

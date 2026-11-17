@@ -12,23 +12,37 @@ using System.Text.Json;
 namespace FlintLauncher.ExternalApi.AtLauncher;
 
 /// <summary>The share-codes/{code} wire shape; `message` may be a JSON null.</summary>
-public sealed record AtlShareCodeResponseJson(
-    bool? Error,
-    int? Code,
-    string? Message,
-    AtlShareCodeJson? Data);
+public sealed record AtlShareCodeResponseJson
+{
+    public required bool Error { get; init; }
 
-public sealed record AtlShareCodeJson(
-    string? Pack,
-    string? Version,
-    AtlShareCodeModsJson? Mods);
+    public required int Code { get; init; }
 
-public sealed record AtlShareCodeModsJson(
-    List<AtlShareCodeModJson>? Optional);
+    public string? Message { get; init; }
 
-public sealed record AtlShareCodeModJson(
-    bool? Selected,
-    string? Name);
+    public AtlShareCodeJson? Data { get; init; }
+}
+
+public sealed record AtlShareCodeJson
+{
+    public required string Pack { get; init; }
+
+    public required string Version { get; init; }
+
+    public required AtlShareCodeModsJson Mods { get; init; }
+}
+
+public sealed record AtlShareCodeModsJson
+{
+    public required List<AtlShareCodeModJson> Optional { get; init; }
+}
+
+public sealed record AtlShareCodeModJson
+{
+    public required bool Selected { get; init; }
+
+    public required string Name { get; init; }
+}
 // (the AtLauncherJsonContext declaration lives in AtLauncherJson.cs beside the parse
 // entries — the STJ source generator cannot declare one context across two files)
 
@@ -45,34 +59,19 @@ public static class AtLauncherShareCode
     /// <summary>Port of ATLauncher::loadShareCodeResponse.</summary>
     public static ShareCodeResponse LoadShareCodeResponse(AtlShareCodeResponseJson obj)
     {
-        var error = Require(obj.Error, "error");
-        Require(obj.Code, "code");
-        if (error)
+        if (obj.Error)
         {
             return new ShareCodeResponse(true, obj.Message, null);
         }
 
         var data = obj.Data ?? throw new JsonException("'data' is not an object");
-        var pack = Require(data.Pack, "pack");
-        var version = Require(data.Version, "version");
-
-        var mods = data.Mods ?? throw new JsonException("'mods' is not an object");
-        var optional = mods.Optional ?? throw new JsonException("'optional' is not an array");
-        var selections = new List<ShareCodeMod>(optional.Count);
-        foreach (var mod in optional)
+        var selections = new List<ShareCodeMod>(data.Mods.Optional.Count);
+        foreach (var rawMod in data.Mods.Optional)
         {
-            selections.Add(new ShareCodeMod(
-                Require(mod.Selected, "selected"),
-                Require(mod.Name, "name")));
+            var mod = rawMod ?? throw new JsonException("Value is not an object");
+            selections.Add(new ShareCodeMod(mod.Selected, mod.Name));
         }
 
-        return new ShareCodeResponse(false, null, new ShareCode(pack, version, selections));
+        return new ShareCodeResponse(false, null, new ShareCode(data.Pack, data.Version, selections));
     }
-
-    private static string Require(string? value, string key) =>
-        value ?? throw new JsonException("'" + key + "' is not a string");
-
-    private static T Require<T>(T? value, string key) where T : struct =>
-        value ?? throw new JsonException(
-            "'" + key + "' is not a " + (typeof(T) == typeof(int) ? "integer" : typeof(T).Name.ToLowerInvariant()));
 }

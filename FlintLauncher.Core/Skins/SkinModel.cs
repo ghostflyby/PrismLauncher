@@ -40,23 +40,24 @@ public enum SkinModelKind
 /// <summary>The index.json wire: {"skins": [...]}, camelCase members.</summary>
 internal sealed record SkinIndexJson
 {
-    public SkinEntryJson[]? Skins { get; init; }
+    public required SkinEntryJson[] Skins { get; init; }
 }
 
 /// <summary>One index entry; the wire model is the "CLASSIC"/"SLIM" string and anything
 /// else reads CLASSIC (the C++ comparison).</summary>
 internal sealed record SkinEntryJson
 {
-    public string? Name { get; init; }
+    public required string Name { get; init; }
 
     public string? CapeId { get; init; }
 
     public string? Url { get; init; }
 
-    public string? Model { get; init; }
+    public required string Model { get; init; }
 }
 
-[JsonSourceGenerationOptions(WriteIndented = true, PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
+[JsonSourceGenerationOptions(WriteIndented = true, PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
+    RespectNullableAnnotations = true)]
 [JsonSerializable(typeof(SkinIndexJson))]
 internal sealed partial class SkinJsonContext : JsonSerializerContext;
 
@@ -77,7 +78,7 @@ public sealed class SkinModel
     /// <summary>The wire entry → model (the C++ SkinModel(QJsonObject) read).</summary>
     internal static SkinModel FromWire(AbsolutePath skinsDir, SkinEntryJson entry)
     {
-        return new SkinModel(skinsDir, entry.Name ?? "", entry.CapeId, entry.Url,
+        return new SkinModel(skinsDir, entry.Name, entry.CapeId, entry.Url,
             entry.Model == "SLIM" ? SkinModelKind.Slim : SkinModelKind.Classic);
     }
 
