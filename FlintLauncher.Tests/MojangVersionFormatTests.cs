@@ -145,11 +145,10 @@ public class MojangVersionFormatTests
     [Fact]
     public void ReadVersionProperties_ErrorMessages_FailTheDocument()
     {
-        // the typed readers fail the whole document on malformed members, wrapped in the
-        // "{what}: Error parsing JSON: ..." family like the former RequireDocument reads;
-        // a MISSING required member keeps the require-check collapse ("'key' is not a ...")
+        // the typed readers fail the whole document on malformed or missing required
+        // members, wrapped in the "{what}: Error parsing JSON: ..." family
         Assert.StartsWith("version file: Error parsing JSON: ", ReadError("""{"assetIndex": 3}"""));
-        Assert.Equal("'sha1' is not a string", ReadError("""{"downloads": {"client": {"url": "u"}}}"""));
+        Assert.StartsWith("version file: Error parsing JSON: ", ReadError("""{"downloads": {"client": {"url": "u"}}}"""));
         Assert.StartsWith("version file: Error parsing JSON: ", ReadError("""{"downloads": {"client": {"sha1": "s", "size": 1.5, "url": "u"}}}"""));
         Assert.StartsWith("version file: Error parsing JSON: ", ReadError("""{"downloads": {"client": 3}}"""));
         Assert.StartsWith("version file: Error parsing JSON: ", ReadError("""{"minimumLauncherVersion": 1.5}"""));
@@ -207,11 +206,10 @@ public class MojangVersionFormatTests
     }
 
     [Fact]
-    public void LibraryFromJson_MissingName_KeepsTheUpstreamTypo()
+    public void LibraryFromJson_MissingName_FailsTheWire()
     {
         var e = Assert.Throws<JsonException>(() => MojangVersionFormat.LibraryFromJson(new ProblemContainer(), ParseNode("{}"), "lib.json"));
-        // upstream typo preserved: no space between the filename and "contains"
-        Assert.Equal("lib.jsoncontains a library that doesn't have a 'name' field", e.Message);
+        Assert.StartsWith("lib.json: Error parsing JSON: ", e.Message);
     }
 
     [Fact]

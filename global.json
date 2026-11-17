@@ -3,12 +3,12 @@
   // installed SDK at or above this floor, so a newer feature band or patch never
   // forces a bump here.
   "sdk": {
-    "version": "10.0.404",
+    "version": "11.0.100",
     "rollForward": "Major",
     "allowPrerelease": false
   },
-  // Opts dotnet test into its .NET 10 MTP mode, which is how the xunit.v3 test project runs
-  // (the legacy VSTest mode refuses MTP projects on the .NET 10 SDK).
+  // Opts dotnet test into its MTP mode, which is how the xunit.v3 test project runs
+  // (the legacy VSTest mode refuses MTP projects).
   "test": {
     "runner": "Microsoft.Testing.Platform"
   }

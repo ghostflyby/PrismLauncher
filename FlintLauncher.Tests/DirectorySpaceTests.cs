@@ -170,13 +170,17 @@ public class DirectorySpaceTests : IDisposable
         // at the NEW location as part of the move (the tenant re-point handler ran first)
         Assert.Equal([target], movedTo);
         Assert.True((target / "marker.txt").ExistsFile());
-        Assert.Equal(1, reconciles);
+        // the cooperative move reconciles; the platform watcher may also deliver the
+        // self-rename event, so the exact count is not part of the contract (reconciles
+        // are idempotent) — the location is
+        var reconcilesAfterMove = reconciles;
+        Assert.InRange(reconcilesAfterMove, 1, 2);
         Assert.Equal(target, reconciledAt);
         Assert.False(from.Path.ExistsDirectory()); // it MOVED — the old path is gone
 
         // later pulses keep reconciling the re-keyed registration
         space.Pulse(target);
-        Assert.Equal(2, reconciles);
+        Assert.True(reconciles > reconcilesAfterMove);
 
         // a move whose source is not a registered root is refused
         Assert.False(space.Move(from.Path, _root / "never"));

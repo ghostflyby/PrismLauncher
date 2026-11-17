@@ -42,15 +42,21 @@ public enum TechnicSearchMode : byte
 }
 
 /// <summary>The trending/search list root.</summary>
-public sealed record TechnicSearchListJson(
-    List<TechnicListEntryJson>? Modpacks);
+public sealed record TechnicSearchListJson
+{
+    public required List<TechnicListEntryJson> Modpacks { get; init; }
+}
 
 /// <summary>One trending/search entry; a null iconUrl carries the literal "null" sentinel
 /// (the caller maps it to the null-logo placeholder).</summary>
-public sealed record TechnicListEntryJson(
-    string? Name,
-    string? Slug,
-    string? IconUrl);
+public sealed record TechnicListEntryJson
+{
+    public required string Name { get; init; }
+
+    public required string Slug { get; init; }
+
+    public string? IconUrl { get; init; }
+}
 
 /// <summary>The single-pack response; an "error" member marks the invalid-API-url
 /// answer.</summary>

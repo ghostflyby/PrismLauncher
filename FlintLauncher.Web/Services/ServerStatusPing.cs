@@ -377,7 +377,8 @@ internal sealed class MotdConverter : JsonConverter<string?>
         writer.WriteStringValue(value);
 }
 
-[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
+[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
+    RespectNullableAnnotations = true)]
 [JsonSerializable(typeof(ServerStatusJson))]
 [JsonSerializable(typeof(ServerStatusPlayersJson))]
 [JsonSerializable(typeof(ServerStatusVersionJson))]

@@ -348,7 +348,7 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
 
     internal sealed record RequireOutJson
     {
-        public string Uid { get; init; } = "";
+        public required string Uid { get; init; }
 
         [JsonPropertyName("equals")]
         public string? EqualsVersion { get; init; }
@@ -358,7 +358,7 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
 
     internal sealed record ComponentOutJson
     {
-        public string Uid { get; init; } = "";
+        public required string Uid { get; init; }
 
         public string? Version { get; init; }
 
@@ -382,9 +382,9 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
     internal sealed record PackConfigOutJson
     {
         [JsonPropertyName("formatVersion")]
-        public int FormatVersion { get; init; }
+        public required int FormatVersion { get; init; }
 
-        public List<ComponentOutJson>? Components { get; init; }
+        public required List<ComponentOutJson> Components { get; init; }
     }
 
     /// <summary>Require list → wire (the former MetaJsonFormat.SerializeRequires shape:
@@ -430,7 +430,7 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
     {
         [JsonPropertyName("formatVersion")]
         [JsonConverter(typeof(QtCoercingIntConverter))]
-        public int FormatVersion { get; set; }
+        public required int FormatVersion { get; set; }
 
         public List<PackComponentJson>? Components { get; set; }
     }
@@ -438,7 +438,7 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
     internal sealed record PackComponentJson
     {
         /// <summary>Required — a missing member fails the file (the former RequireString).</summary>
-        public string? Uid { get; set; }
+        public required string Uid { get; set; }
 
         [JsonConverter(typeof(QtCoercingStringConverter))]
         public string Version { get; set; } = "";
@@ -471,8 +471,7 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
         // critical — the uid member is required (the former RequireString throw), and a
         // null list entry is the former "Component must be an object." throw
         var component = new Component(parent,
-            (wire ?? throw new JsonException("Component must be an object.")).Uid
-            ?? throw new JsonException("'uid' is not a string"))
+            (wire ?? throw new JsonException("Component must be an object.")).Uid)
         {
             Version = wire.Version,
             DependencyOnly = wire.DependencyOnly,
@@ -1201,7 +1200,8 @@ public sealed class PackProfile(IPackProfileEnv env, Index? metadataIndex = null
 
 [JsonSourceGenerationOptions(WriteIndented = true,
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
-    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
+    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+    RespectNullableAnnotations = true)]
 [JsonSerializable(typeof(PackProfile.PackConfigOutJson))]
 [JsonSerializable(typeof(PackProfile.PackConfigJson))]
 internal sealed partial class PackConfigJsonContext : JsonSerializerContext;

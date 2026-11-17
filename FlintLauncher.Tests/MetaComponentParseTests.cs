@@ -73,4 +73,22 @@ public class MetaComponentParseTests
 
     [Fact]
     public void Test_ParseComponentWithMixed() => DoTest("component_with_mixed.json");
+
+    [Fact]
+    public void NonArrayExtra_ReadsNull()
+    {
+        // the old probe kept a non-array extra as "no extra" instead of failing the tree
+        var component = JsonSerializer.Deserialize(
+            """{"text":"x","extra":5}""", DataPackJsonContext.Default.ChatComponentJson);
+        Assert.Equal("x", DataPackUtils.ProcessComponent(component));
+    }
+
+    [Fact]
+    public void MissingDescription_ReadsNull()
+    {
+        var meta = JsonSerializer.Deserialize(
+            """{"pack":{"pack_format":1}}""", DataPackJsonContext.Default.PackMcmetaJson);
+        Assert.NotNull(meta);
+        Assert.Null(meta.Pack.Description);
+    }
 }

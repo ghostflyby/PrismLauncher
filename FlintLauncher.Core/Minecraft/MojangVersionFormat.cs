@@ -23,9 +23,7 @@
 // Port of launcher/minecraft/MojangVersionFormat.{h,cpp}.
 //
 // QJsonDocument parameters become JsonObject/JsonNode reads (single-DOM model); the
-// QObject::tr() strings are kept as literal (untranslated) format strings. The upstream typo
-// of a missing space in "<filename>contains a library that doesn't have a 'name' field" is
-// preserved.
+// QObject::tr() strings are kept as literal (untranslated) format strings.
 
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -219,7 +217,7 @@ public static class MojangVersionFormat
                 ? new Dictionary<string, string>(library.NativeClassifiers, StringComparer.Ordinal)
                 : null,
             Extract = library.IsNative() && library.ExtractExcludes.Count != 0
-                ? new LibraryExtractJson([.. library.ExtractExcludes])
+                ? new LibraryExtractJson { Exclude = [.. library.ExtractExcludes] }
                 : null,
             Rules = library.Rules.Count != 0 ? library.Rules.Select(RuleToJson).ToList() : null,
             Downloads = library.MojangDownloads is { } downloads ? LibDownloadInfoToJson(downloads) : null,

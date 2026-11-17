@@ -41,10 +41,14 @@ using TruePath;
 namespace FlintLauncher.Core.Minecraft;
 
 /// <summary>The dt-order/override order file shape ({"version":N,"order":[uid,...]}).</summary>
-internal sealed record OverrideOrderFileJson(
-    [property: JsonPropertyName("version")]
-    int? Version,
-    [property: JsonPropertyName("order")] List<string>? Order);
+internal sealed record OverrideOrderFileJson
+{
+    [JsonPropertyName("version")]
+    public required int Version { get; init; }
+
+    [JsonPropertyName("order")]
+    public List<string>? Order { get; init; }
+}
 
 [JsonSerializable(typeof(OverrideOrderFileJson))]
 internal sealed partial class ProfileUtilsJsonContext : JsonSerializerContext;

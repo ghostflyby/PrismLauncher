@@ -16,7 +16,7 @@ public sealed record LauncherState : IStateVersioned
     public const int CurrentVersion = 1;
 
     // The materializing constructor: the source-generated deserializer does not honor
-    // property initializers for members absent from the payload (.NET 10), so the ctor body
+    // property initializers for members absent from the payload, so the ctor body
     // re-materializes the sub-records — every deserialized LauncherState has real domain
     // values, and LauncherStateStore's fold only normalizes inner scalars.
     [JsonConstructor, SetsRequiredMembers]

@@ -106,9 +106,9 @@ internal static class ApiOpenApi
                 operation.Responses["200"] = new OpenApiResponse
                 {
                     Description = "Server-sent events: 'data:' frames carry LogLineDto JSON, a final 'event: state' frame carries TaskView.",
-                    Content = new Dictionary<string, OpenApiMediaType>
+                    Content = new Dictionary<string, IOpenApiMediaType>
                     {
-                        ["text/event-stream"] = new(),
+                        ["text/event-stream"] = new OpenApiMediaType(),
                     },
                 };
             }
@@ -118,9 +118,9 @@ internal static class ApiOpenApi
                 operation.Responses["200"] = new OpenApiResponse
                 {
                     Description = "The log file tail (last 512 KiB).",
-                    Content = new Dictionary<string, OpenApiMediaType>
+                    Content = new Dictionary<string, IOpenApiMediaType>
                     {
-                        ["text/plain"] = new()
+                        ["text/plain"] = new OpenApiMediaType
                         {
                             Schema = new OpenApiSchema { Type = JsonSchemaType.String },
                         },
@@ -134,9 +134,9 @@ internal static class ApiOpenApi
                 {
                     Required = true,
                     Description = form.Description,
-                    Content = new Dictionary<string, OpenApiMediaType>
+                    Content = new Dictionary<string, IOpenApiMediaType>
                     {
-                        ["multipart/form-data"] = new()
+                        ["multipart/form-data"] = new OpenApiMediaType
                         {
                             Schema = new OpenApiSchema
                             {
@@ -155,9 +155,9 @@ internal static class ApiOpenApi
     private static OpenApiResponse ErrorResponse(string code) => new()
     {
         Description = code,
-        Content = new Dictionary<string, OpenApiMediaType>
+        Content = new Dictionary<string, IOpenApiMediaType>
         {
-            ["application/json"] = new() { Schema = ErrorEnvelopeSchema() },
+            ["application/json"] = new OpenApiMediaType { Schema = ErrorEnvelopeSchema() },
         },
     };
 }

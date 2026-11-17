@@ -29,9 +29,12 @@ namespace FlintLauncher.ExternalApi.Imgur;
 
 /// <summary>The imgur response envelope {"success": true, "data": {...}} — shared by the
 /// image upload and album creation replies.</summary>
-public sealed record ImgurResponseJson(
-    bool? Success,
-    ImgurDataJson? Data);
+public sealed record ImgurResponseJson
+{
+    public required bool Success { get; init; }
+
+    public ImgurDataJson? Data { get; init; }
+}
 
 public sealed record ImgurDataJson(
     string? Id,
@@ -40,6 +43,7 @@ public sealed record ImgurDataJson(
     [property: JsonPropertyName("deletehash")]
     string? DeleteHash);
 
-[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
+[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
+    RespectNullableAnnotations = true)]
 [JsonSerializable(typeof(ImgurResponseJson))]
 public sealed partial class ImgurJsonContext : JsonSerializerContext;

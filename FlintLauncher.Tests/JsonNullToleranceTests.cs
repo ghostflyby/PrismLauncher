@@ -20,6 +20,8 @@ using System.Text.Json.Nodes;
 using FlintLauncher.Core.Launch;
 using FlintLauncher.Core.Meta;
 using FlintLauncher.Core.Minecraft;
+using FlintLauncher.Core.Net;
+using FlintLauncher.Core.Skins;
 using FlintLauncher.ExternalApi.AtLauncher;
 using FlintLauncher.ExternalApi.Technic;
 using TruePath;
@@ -144,6 +146,39 @@ public class JsonNullToleranceTests
             Assert.True(AssetsUtils.LoadAssetsIndexJson("test", new AbsolutePath(path), index));
             Assert.True(index.Objects.ContainsKey("x"));
             Assert.Equal("", index.Objects["x"].Hash);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    // ------------------------------------------------------- local index files
+
+    [Fact]
+    public void SkinIndex_NullEntry_FailsTheFile()
+    {
+        var dir = Directory.CreateTempSubdirectory("flint-skins-null-").FullName;
+        try
+        {
+            File.WriteAllText(Path.Combine(dir, "index.json"), """{"skins":[null]}""");
+            Assert.Empty(SkinListStore.Load(new AbsolutePath(dir)));
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void MetaCache_NullEntry_IsSkipped()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"flint-metacache-null-{Guid.NewGuid():N}.json");
+        File.WriteAllText(path, """{"version":"1","entries":[null]}""");
+        try
+        {
+            using var cache = new HttpMetaCache(new AbsolutePath(path));
+            cache.Load();
         }
         finally
         {

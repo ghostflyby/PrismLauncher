@@ -60,6 +60,10 @@ public class WatchTenancyWiringTests : IDisposable
         var moved = _root / "instances-elsewhere";
         Assert.True(_space.Move(instances, moved));
 
+        // the move re-points synchronously; the platform watcher may also deliver the
+        // self-rename event on its debounce thread, so settle it before touching the list
+        Thread.Sleep(250);
+
         Assert.Equal([moved], list.InstanceDirs);
         Assert.True(_space.IsRegistered(moved));
         Assert.False(_space.IsRegistered(instances));

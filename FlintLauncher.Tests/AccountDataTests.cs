@@ -283,11 +283,11 @@ public class AccountDataTests
     }
 
     [Fact]
-    public void Broken_Profile_Does_Not_Grant_Entitlement_Fallback()
+    public void Profile_Without_Mandatory_Skin_Fails_The_Account_Wire()
     {
-        // profile present but missing the mandatory skin attributes -> profile invalid -> no fallback
-        var data = new AccountData();
-        Assert.True(data.ResumeStateFromV3(Wire("""
+        // the mandatory id/name/skin trio is required by the wire shape; a broken profile
+        // fails the account decode instead of landing as an empty profile
+        Assert.Throws<JsonException>(() => Wire("""
                                                 {
                                                     "type": "MSA",
                                                     "profile": {
@@ -296,9 +296,7 @@ public class AccountDataTests
                                                         "capes": []
                                                     }
                                                 }
-                                                """)));
-        Assert.Equal(Validity.None, data.MinecraftEntitlement.Validity);
-        Assert.False(data.MinecraftEntitlement.OwnsMinecraft);
+                                                """));
     }
 
     [Fact]
@@ -306,7 +304,7 @@ public class AccountDataTests
     {
         var data = new AccountData();
         Assert.False(data.ResumeStateFromV3(Wire("""{"type": "Elsewhere"}""")));
-        Assert.False(data.ResumeStateFromV3(Wire("""{"noTypeHere": true}""")));
+        Assert.Throws<JsonException>(() => Wire("""{"noTypeHere": true}"""));
     }
 
     [Fact]

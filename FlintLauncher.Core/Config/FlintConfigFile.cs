@@ -6,7 +6,7 @@
 // registration is a runtime failure, not a compile error).
 //
 // Layering shape: the DOMAIN members are non-null — the materializing constructor
-// re-creates every domain the payload omitted (the .NET 10 source-generated deserializer
+// re-creates every domain the payload omitted (the source-generated deserializer
 // overwrites init-only initializers with null for absent members), and the domain records
 // are BLANK (no scalar initializers) so those re-created domains are inert: every scalar
 // stays null = "not set at this layer, inherit from the layer below". The single source of

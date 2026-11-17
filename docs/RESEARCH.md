@@ -10,7 +10,7 @@
 - **Native AOT 必须支持**（`PublishAot=true`）。
 - 纯 GUI 表现层（主题/猫包/动画、翻译 UI、3D 皮肤预览、桌面快捷方式、Sparkle 更新器 UI 等）**不移植**，在 MAPPING.md 中记录为 `GUI-bound, not ported`。
 - **完全兼容现有 PrismLauncher 数据目录**：instances 布局、`instance.cfg`、`prismlauncher.cfg`、`accounts.json`、meta 缓存格式全部互通。
-- 目标框架 **net10.0**；解决方案 `FlintLauncher.slnx` 在仓库根，每个项目对应顶级 `FlintLauncher.*` 目录（csproj 直接位于目录下）。
+- 目标框架 **net11.0**；解决方案 `FlintLauncher.slnx` 在仓库根，每个项目对应顶级 `FlintLauncher.*` 目录（csproj 直接位于目录下）。
 
 ## 1. 原应用架构总览
 

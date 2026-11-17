@@ -41,32 +41,47 @@ namespace FlintLauncher.Core.Net;
 /// <summary>The metacache wire shape: {"version":"1","entries":[...]} — the coercing
 /// converters keep the QJsonValue fallbacks of the former readers (junk timestamps/ages
 /// truncate to 0, junk strings become "").</summary>
-public sealed record MetaCacheFileJson(
-    string? Version,
-    List<MetaCacheEntryJson>? Entries);
+public sealed record MetaCacheFileJson
+{
+    public required string Version { get; init; }
 
-public sealed record MetaCacheEntryJson(
-    [property: JsonConverter(typeof(QtCoercingStringConverter))]
-    string? Base,
-    [property: JsonConverter(typeof(QtCoercingStringConverter))]
-    string? Path,
-    [property: JsonPropertyName("md5sum")]
-    [property: JsonConverter(typeof(QtCoercingStringConverter))]
-    string? Md5Sum,
-    [property: JsonConverter(typeof(QtCoercingStringConverter))]
-    string? Etag,
-    [property: JsonConverter(typeof(QtCoercingLongConverter))]
-    long LastChangedTimestamp,
-    [property: JsonConverter(typeof(QtCoercingStringConverter))]
-    string? RemoteChangedTimestamp,
-    bool? Eternal,
-    [property: JsonConverter(typeof(QtCoercingLongConverter))]
-    long? CurrentAge,
-    [property: JsonConverter(typeof(QtCoercingLongConverter))]
-    long? MaxAge);
+    public required List<MetaCacheEntryJson> Entries { get; init; }
+}
+
+public sealed record MetaCacheEntryJson
+{
+    [JsonConverter(typeof(QtCoercingStringConverter))]
+    public required string Base { get; init; }
+
+    [JsonConverter(typeof(QtCoercingStringConverter))]
+    public required string Path { get; init; }
+
+    [JsonPropertyName("md5sum")]
+    [JsonConverter(typeof(QtCoercingStringConverter))]
+    public required string Md5Sum { get; init; }
+
+    [JsonConverter(typeof(QtCoercingStringConverter))]
+    public required string Etag { get; init; }
+
+    [JsonConverter(typeof(QtCoercingLongConverter))]
+    public required long LastChangedTimestamp { get; init; }
+
+    /// <summary>Absent when empty; the eternal/age pair is one-or-the-other.</summary>
+    [JsonConverter(typeof(QtCoercingStringConverter))]
+    public string? RemoteChangedTimestamp { get; init; }
+
+    public bool? Eternal { get; init; }
+
+    [JsonConverter(typeof(QtCoercingLongConverter))]
+    public long? CurrentAge { get; init; }
+
+    [JsonConverter(typeof(QtCoercingLongConverter))]
+    public long? MaxAge { get; init; }
+}
 
 [JsonSourceGenerationOptions(DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-    PropertyNamingPolicy = JsonKnownNamingPolicy.SnakeCaseLower)]
+    PropertyNamingPolicy = JsonKnownNamingPolicy.SnakeCaseLower,
+    RespectNullableAnnotations = true)]
 [JsonSerializable(typeof(MetaCacheFileJson))]
 internal sealed partial class MetaCacheJsonContext : JsonSerializerContext;
 
@@ -439,7 +454,13 @@ public sealed class HttpMetaCache(AbsolutePath path) : IDisposable
         {
             foreach (var raw in array)
             {
-                var baseId = raw.Base ?? "";
+                // a null entry is the former QJsonValue::toObject() empty object -> no base
+                if (raw is null)
+                {
+                    continue;
+                }
+
+                var baseId = raw.Base;
                 if (!_basePaths.ContainsKey(baseId))
                 {
                     continue;
@@ -448,9 +469,9 @@ public sealed class HttpMetaCache(AbsolutePath path) : IDisposable
                 var entry = new MetaEntry
                 {
                     BaseId = baseId,
-                    RelativePath = raw.Path ?? "",
-                    Md5Sum = raw.Md5Sum ?? "",
-                    Etag = raw.Etag ?? "",
+                    RelativePath = raw.Path,
+                    Md5Sum = raw.Md5Sum,
+                    Etag = raw.Etag,
                     LocalChangedTimestamp = raw.LastChangedTimestamp,
                     RemoteChangedTimestamp = raw.RemoteChangedTimestamp ?? "",
                     IsEternal = raw.Eternal ?? false,
@@ -495,24 +516,26 @@ public sealed class HttpMetaCache(AbsolutePath path) : IDisposable
                         continue;
                     }
 
-                    entriesArr.Add(new MetaCacheEntryJson(
-                        Base: entry.BaseId,
-                        Path: entry.RelativePath,
-                        Md5Sum: entry.Md5Sum,
-                        Etag: entry.Etag,
-                        LastChangedTimestamp: entry.LocalChangedTimestamp,
+                    entriesArr.Add(new MetaCacheEntryJson
+                    {
+                        Base = entry.BaseId,
+                        Path = entry.RelativePath,
+                        Md5Sum = entry.Md5Sum,
+                        Etag = entry.Etag,
+                        LastChangedTimestamp = entry.LocalChangedTimestamp,
                         // absent when empty; the eternal/age pair is one-or-the-other
                         // (WhenWritingNull drops the unused halves, like the former
                         // conditional writes)
-                        RemoteChangedTimestamp:
-                        entry.RemoteChangedTimestamp.Length > 0 ? entry.RemoteChangedTimestamp : null,
-                        Eternal: entry.IsEternal ? true : null,
-                        CurrentAge: entry.IsEternal ? null : entry.CurrentAge,
-                        MaxAge: entry.IsEternal ? null : entry.MaxAge));
+                        RemoteChangedTimestamp =
+                            entry.RemoteChangedTimestamp.Length > 0 ? entry.RemoteChangedTimestamp : null,
+                        Eternal = entry.IsEternal ? true : null,
+                        CurrentAge = entry.IsEternal ? null : entry.CurrentAge,
+                        MaxAge = entry.IsEternal ? null : entry.MaxAge,
+                    });
                 }
             }
 
-            entriesRoot = new MetaCacheFileJson(Version: "1", Entries: entriesArr);
+            entriesRoot = new MetaCacheFileJson { Version = "1", Entries = entriesArr };
         }
 
         try

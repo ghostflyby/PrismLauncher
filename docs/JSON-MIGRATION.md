@@ -63,4 +63,4 @@
 
 ## 5. 验证
 
-每批次：`dotnet build` + `dotnet exec FlintLauncher.Tests/bin/Debug/net10.0/FlintLauncher.Tests.dll` 全量绿（本机 `dotnet test` SDK 包装器有管道问题，勿用）。
+每批次：`dotnet build` + `dotnet exec FlintLauncher.Tests/bin/Debug/net11.0/FlintLauncher.Tests.dll` 全量绿（本机 `dotnet test` SDK 包装器有管道问题，勿用）。
