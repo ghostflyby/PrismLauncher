@@ -5,7 +5,7 @@
   <!-- Common properties for all Flint projects. See docs/PLAN.md -->
   <PropertyGroup>
     <TargetFramework>net11.0</TargetFramework>
-    <LangVersion>latest</LangVersion>
+    <LangVersion>15.0</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <Version>0.1.0</Version>
