@@ -46,11 +46,12 @@ jobs:
         run: dotnet restore FlintLauncher.slnx
 
       # Pinned: the rule set changes between releases and would flip the gate.
+      # 2026.3.0 is the first toolchain that parses the C# 15 union declarations.
       # Warnings and errors only: code scanning turns every result into an alert.
       # Release, matching the CI matrix: analyze exactly what the build/test
       # gate compiles, not a second configuration nobody ships.
       - name: Run InspectCode
-        run: dotnet tool exec --yes JetBrains.ReSharper.GlobalTools@2026.2.3.1 -- inspectcode FlintLauncher.slnx --properties:Configuration=Release --output=inspect.sarif --format=Sarif --severity=WARNING --swea --verbosity=WARN
+        run: dotnet tool exec --yes JetBrains.ReSharper.GlobalTools@2026.3.0 -- inspectcode FlintLauncher.slnx --properties:Configuration=Release --output=inspect.sarif --format=Sarif --severity=WARNING --swea --verbosity=WARN
 
       # InspectCode exits 0 regardless of findings; only error level fails.
       - name: Enforce the failure gate
