@@ -20,7 +20,8 @@ jobs:
     # Not "InspectCode": the SARIF upload creates a check run of that name too.
     name: InspectCode gate
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    # 2026.3's union-aware analysis outruns the old 20-minute budget.
+    timeout-minutes: 30
     permissions:
       contents: read
       security-events: write
