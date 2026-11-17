@@ -483,7 +483,7 @@ internal sealed class TolerantPackVersionConverter : JsonConverter<PackVersionJs
         switch (reader.TokenType)
         {
             case JsonTokenType.Number:
-                return (PackVersionJson)(reader.TryGetDouble(out var single) ? single : 0);
+                return reader.TryGetDouble(out var single) ? single : 0d;
             case JsonTokenType.StartArray:
             {
                 var node = JsonNode.Parse(ref reader) as JsonArray;
@@ -498,7 +498,7 @@ internal sealed class TolerantPackVersionConverter : JsonConverter<PackVersionJs
                     }
                 }
 
-                return (PackVersionJson)values;
+                return values;
             }
             default:
                 return null;
@@ -522,20 +522,20 @@ internal sealed class TolerantChatComponentConverter : JsonConverter<ChatCompone
         switch (reader.TokenType)
         {
             case JsonTokenType.String:
-                return (ChatComponentJson)(reader.GetString() ?? "");
+                return reader.GetString() ?? "";
             case JsonTokenType.True:
             case JsonTokenType.False:
-                return (ChatComponentJson)(reader.TokenType == JsonTokenType.True);
+                return reader.TokenType == JsonTokenType.True;
             case JsonTokenType.Number:
-                return (ChatComponentJson)(reader.TryGetDouble(out var number) ? number : 0);
+                return reader.TryGetDouble(out var number) ? number : 0d;
             case JsonTokenType.StartArray:
-                return (ChatComponentJson)ReadArray(ref reader);
+                return ReadArray(ref reader);
             case JsonTokenType.StartObject:
             {
                 var component = JsonSerializer.Deserialize(
                     ref reader, DataPackJsonContext.Default.ComponentObjectJson)
                     ?? throw new JsonException("Value is not an object");
-                return (ChatComponentJson)component;
+                return component;
             }
             default:
                 return null;
