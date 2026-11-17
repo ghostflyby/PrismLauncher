@@ -229,12 +229,19 @@ public static class DataPackUtils
             return false;
         }
 
-        pack.SetPackFormat(section.PackFormat,
-            section.MinFormat is { } min ? (min.Major, min.Minor) : default,
-            section.MaxFormat is { } max ? (max.Major, max.Minor) : default);
+        pack.SetPackFormat(section.PackFormat, PackVersion(section.MinFormat), PackVersion(section.MaxFormat));
         pack.SetDescription(ProcessComponent(section.Description));
         return true;
     }
+
+    private static (int Major, int Minor) PackVersion(PackVersionJson? version) => version switch
+    {
+        double single => ((int)single, 0),
+        List<double> array => (
+            array.Count >= 1 ? (int)array[0] : 0,
+            array.Count >= 2 ? (int)array[1] : 0),
+        _ => default,
+    };
 
     private static string BuildStyle(ComponentObjectJson obj)
     {
@@ -257,7 +264,7 @@ public static class DataPackUtils
         return styles.Count == 0 ? "" : $"style=\"{string.Join(" ", styles)}\"";
     }
 
-    private static string ProcessComponent(List<ChatComponentJson> value, bool strikethrough, bool underline)
+    private static string ProcessComponent(List<ChatComponentJson?> value, bool strikethrough, bool underline)
     {
         var result = "";
         foreach (var current in value)
@@ -309,11 +316,11 @@ public static class DataPackUtils
     {
         return value switch
         {
-            { Text: { } text } => text,
-            { BoolValue: { } b } => b ? "true" : "false",
-            { NumberValue: { } number } => NumberToString(number),
-            { Array: { } array } => ProcessComponent(array, strikethrough, underline),
-            { Object: { } obj } => ProcessComponent(obj, strikethrough, underline),
+            string text => text,
+            bool b => b ? "true" : "false",
+            double number => NumberToString(number),
+            List<ChatComponentJson?> array => ProcessComponent(array, strikethrough, underline),
+            ComponentObjectJson obj => ProcessComponent(obj, strikethrough, underline),
             _ => "", // qWarning() << "Invalid component type!";
         };
     }
@@ -438,7 +445,7 @@ public static class DataPackUtils
 // ----------------------------------------------------------------------------------------
 // The pack.mcmeta wire (typed reads; nothing here is ever written). The description member
 // is the Minecraft raw-JSON text component (string | bool | number | array | object tree) —
-// the ChatComponentConverter unifies those forms and the coercing converters keep the
+// the ChatComponentJson union unifies those forms and the coercing converters keep the
 // per-member junk degradation of the former StringOr/BoolOr probes.
 
 internal sealed record PackMcmetaJson
@@ -453,108 +460,20 @@ internal sealed record PackMetaSectionJson
     public int PackFormat { get; set; }
 
     [JsonPropertyName("min_format")]
-    [JsonConverter(typeof(PackVersionConverter))]
     public PackVersionJson? MinFormat { get; set; }
 
     [JsonPropertyName("max_format")]
-    [JsonConverter(typeof(PackVersionConverter))]
     public PackVersionJson? MaxFormat { get; set; }
 
-    [JsonConverter(typeof(ChatComponentConverter))]
     public required ChatComponentJson Description { get; set; }
 }
 
-/// <summary>The [major, minor] pack-format pair (a bare number reads [major, 0]).</summary>
-internal sealed record PackVersionJson
-{
-    public int Major { get; set; }
+/// <summary>The pack-format value: a bare major number or a [major, minor] pair.</summary>
+internal union PackVersionJson(double, List<double>);
 
-    public int Minor { get; set; }
-}
-
-internal sealed class PackVersionConverter : JsonConverter<PackVersionJson?>
-{
-    public override PackVersionJson? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
-    {
-        if (reader.TokenType == JsonTokenType.Number && reader.TryGetDouble(out var single))
-        {
-            return new PackVersionJson { Major = (int)single };
-        }
-
-        if (reader.TokenType == JsonTokenType.StartArray)
-        {
-            var node = JsonNode.Parse(ref reader) as JsonArray;
-            var version = new PackVersionJson();
-            if (node is { Count: >= 1 } array)
-            {
-                version.Major = array[0] is JsonValue first && first.TryGetValue<double>(out var major)
-                    ? (int)major
-                    : 0;
-            }
-
-            if (node is { Count: >= 2 } arr2)
-            {
-                version.Minor = arr2[1] is JsonValue second && second.TryGetValue<double>(out var minor)
-                    ? (int)minor
-                    : 0;
-            }
-
-            return version;
-        }
-
-        return null; // a wrong-kind member is no version (the former Contains-guard skip)
-    }
-
-    public override void Write(Utf8JsonWriter writer, PackVersionJson? value, JsonSerializerOptions options) =>
-        throw new NotSupportedException("the pack.mcmeta records are read-only");
-}
-
-/// <summary>The unified raw-JSON text component value: exactly one form is set.</summary>
-[JsonConverter(typeof(ChatComponentConverter))]
-internal sealed record ChatComponentJson
-{
-    public string? Text { get; init; }
-
-    public bool? BoolValue { get; init; }
-
-    public double? NumberValue { get; init; }
-
-    public List<ChatComponentJson>? Array { get; init; }
-
-    public ComponentObjectJson? Object { get; init; }
-}
-
-internal sealed class ChatComponentConverter : JsonConverter<ChatComponentJson?>
-{
-    public override ChatComponentJson? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
-    {
-        switch (reader.TokenType)
-        {
-            case JsonTokenType.String:
-                return new ChatComponentJson { Text = reader.GetString() ?? "" };
-            case JsonTokenType.True:
-            case JsonTokenType.False:
-                return new ChatComponentJson { BoolValue = reader.TokenType == JsonTokenType.True };
-            case JsonTokenType.Number:
-                return new ChatComponentJson { NumberValue = reader.TryGetDouble(out var d) ? d : 0 };
-            case JsonTokenType.StartArray:
-                return new ChatComponentJson
-                {
-                    Array = JsonSerializer.Deserialize(ref reader, DataPackJsonContext.Default.ListChatComponentJson),
-                };
-            case JsonTokenType.StartObject:
-                return new ChatComponentJson
-                {
-                    Object = JsonSerializer.Deserialize(ref reader, DataPackJsonContext.Default.ComponentObjectJson),
-                };
-            default:
-                return null; // qWarning() << "Invalid component type!";
-        }
-    }
-
-    public override void Write(Utf8JsonWriter writer, ChatComponentJson? value, JsonSerializerOptions options) =>
-        throw new NotSupportedException("the pack.mcmeta records are read-only");
-}
+/// <summary>The unified raw-JSON text component value: a string, boolean, number,
+/// array of components, or component object.</summary>
+internal union ChatComponentJson(string, bool, double, List<ChatComponentJson?>, ComponentObjectJson);
 
 internal sealed record ComponentObjectJson
 {
@@ -582,8 +501,7 @@ internal sealed record ComponentObjectJson
     public string Color { get; set; } = "";
 
     /// <summary>Only an array counts (the former `is JsonArray` probe); junk reads null.</summary>
-    [JsonConverter(typeof(ChatExtraConverter))]
-    public List<ChatComponentJson>? Extra { get; set; }
+    public List<ChatComponentJson?>? Extra { get; set; }
 
     [JsonConverter(typeof(ClickEventConverter))]
     public ClickEventJson? ClickEvent { get; set; }
@@ -599,19 +517,6 @@ internal sealed record ClickEventJson
 }
 
 /// <summary>A non-array extra reads null (skipped), like the former probe.</summary>
-internal sealed class ChatExtraConverter : JsonConverter<List<ChatComponentJson>?>
-{
-    public override List<ChatComponentJson>? Read(ref Utf8JsonReader reader, Type typeToConvert,
-        JsonSerializerOptions options)
-    {
-        return reader.TokenType == JsonTokenType.StartArray
-            ? JsonSerializer.Deserialize(ref reader, DataPackJsonContext.Default.ListChatComponentJson)
-            : null;
-    }
-
-    public override void Write(Utf8JsonWriter writer, List<ChatComponentJson>? value, JsonSerializerOptions options) =>
-        throw new NotSupportedException("the pack.mcmeta records are read-only");
-}
 
 /// <summary>A non-object clickEvent reads null (skipped), like the former probe.</summary>
 internal sealed class ClickEventConverter : JsonConverter<ClickEventJson?>
@@ -631,7 +536,7 @@ internal sealed class ClickEventConverter : JsonConverter<ClickEventJson?>
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 [JsonSerializable(typeof(PackMcmetaJson))]
 [JsonSerializable(typeof(ChatComponentJson))]
-[JsonSerializable(typeof(List<ChatComponentJson>))]
+[JsonSerializable(typeof(List<ChatComponentJson?>))]
 [JsonSerializable(typeof(ComponentObjectJson))]
 [JsonSerializable(typeof(ClickEventJson))]
 internal sealed partial class DataPackJsonContext : JsonSerializerContext;

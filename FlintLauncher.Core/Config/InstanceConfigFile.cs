@@ -36,7 +36,7 @@ public sealed record InstanceConfigFile
     public static InstanceConfigFile Default() => new();
 
     // The materializing constructor: the source-generated deserializer overwrites init-only
-    // property initializers with null for members absent from the payload (.NET 10), so the
+    // property initializers with null for members absent from the payload, so the
     // constructor body re-materializes the domains — every in-memory InstanceConfigFile has
     // real domain values regardless of the on-disk shape. The layer semantics live at the
     // SCALAR level (null member = inherit from the user layer / registered defaults),

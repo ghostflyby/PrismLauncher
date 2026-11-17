@@ -314,9 +314,16 @@ public static class ModUtils
             return new ModDetails();
         }
 
+        var entries = document switch
+        {
+            List<McModEntryJson?> list => list,
+            McModInfoObject obj => obj.Modlist ?? obj.ModList ?? [],
+            _ => [],
+        };
+
         // a null first entry is the old "array[0] is not an object" empty-details path
-        return document?.Entries is { Count: > 0 } entries
-            ? InfoFromEntry(entries[0])
+        return entries is { Count: > 0 } && entries[0] is { } first
+            ? InfoFromEntry(first)
             : new ModDetails();
     }
 
@@ -566,9 +573,17 @@ public static class ModUtils
 
         if (fabric.SchemaVersion >= 1)
         {
-            if (fabric.Authors is { } authors)
+            foreach (var author in fabric.Authors ?? [])
             {
-                details.Authors.AddRange(authors);
+                switch (author)
+                {
+                    case string name:
+                        details.Authors.Add(name);
+                        break;
+                    case FabricAuthorObject { Name: var name }:
+                        details.Authors.Add(name);
+                        break;
+                }
             }
 
             if (fabric.Contact is { } contact)
@@ -604,8 +619,14 @@ public static class ModUtils
             return;
         }
 
-        if (icon.Sizes is { Count: > 0 } sizes)
+        if (icon is Dictionary<string, string> sizes)
         {
+            if (sizes.Count == 0)
+            {
+                details.IconFile = "";
+                return;
+            }
+
             // take the largest icon
             var largest = 0;
             var bestIcon = "";
@@ -619,31 +640,35 @@ public static class ModUtils
                 }
             }
 
-            if (bestIcon.Length != 0)
-            {
-                details.IconFile = bestIcon;
-            }
-            else
-            {
-                // take the first
-                details.IconFile = sizes.First().Value;
-            }
+            // take the first when no size key parses
+            details.IconFile = bestIcon.Length != 0 ? bestIcon : sizes.First().Value;
         }
-        else
+        else if (icon is string single)
         {
-            details.IconFile = icon.Single ?? "";
+            details.IconFile = single;
         }
     }
 
     /// <summary>The shared license mapping: the string form runs the parsing constructor
     /// (URL extraction), the object form takes the members verbatim.</summary>
-    private static void AddLicenses(List<FabricLicenseJson>? licenses, ModDetails details)
+    private static void AddLicenses(FabricLicenseValue? license, ModDetails details)
     {
-        foreach (var license in licenses ?? [])
+        IEnumerable<FabricLicenseJson> entries = license switch
         {
-            details.Licenses.Add(license.IsObjectForm
-                ? new ModLicense(license.Name, license.Id, license.Url, license.Description)
-                : new ModLicense(license.Name));
+            string name => [(FabricLicenseJson)name],
+            FabricLicenseObject obj => [(FabricLicenseJson)obj],
+            List<FabricLicenseJson> many => many,
+            _ => [],
+        };
+
+        foreach (var entry in entries)
+        {
+            details.Licenses.Add(entry switch
+            {
+                string name => new ModLicense(name),
+                FabricLicenseObject obj => new ModLicense(obj.Name, obj.Id, obj.Url, obj.Description),
+                _ => new ModLicense(""),
+            });
         }
     }
 
@@ -701,9 +726,13 @@ public static class ModUtils
 
         AddLicenses(modMetadata?.License, details);
 
-        if (modMetadata?.Icon is { } icon)
+        if (modMetadata?.Icon is Dictionary<string, string> sizes)
         {
-            if (icon.Sizes is { Count: > 0 } sizes)
+            if (sizes.Count == 0)
+            {
+                details.IconFile = "";
+            }
+            else
             {
                 // take the largest icon
                 var largest = 0;
@@ -727,15 +756,22 @@ public static class ModUtils
                     details.IconFile = sizes.First().Value;
                 }
             }
-            else
-            {
-                details.IconFile = icon.Single ?? "";
-            }
+        }
+        else if (modMetadata?.Icon is string iconPath)
+        {
+            details.IconFile = iconPath;
         }
 
         foreach (var depend in wire.Depends ?? [])
         {
-            if (depend.Optional == true || depend.Id is not { } modId)
+            var (modId, optional) = depend switch
+            {
+                string id => (id, false),
+                QuiltDependObject { Id: var id, Optional: true } => (id, true),
+                QuiltDependObject { Id: var id } => (id, false),
+                _ => ("", false),
+            };
+            if (optional || modId.Length == 0)
             {
                 continue;
             }
