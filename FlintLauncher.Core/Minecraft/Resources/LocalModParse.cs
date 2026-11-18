@@ -655,8 +655,8 @@ public static class ModUtils
     {
         IEnumerable<FabricLicenseJson> entries = license switch
         {
-            string name => [(FabricLicenseJson)name],
-            FabricLicenseObject obj => [(FabricLicenseJson)obj],
+            string name => [name],
+            FabricLicenseObject obj => [obj],
             List<FabricLicenseJson> many => many,
             _ => [],
         };

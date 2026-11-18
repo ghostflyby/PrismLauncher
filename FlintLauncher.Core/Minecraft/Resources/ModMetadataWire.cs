@@ -159,7 +159,7 @@ internal sealed class TolerantFabricIconConverter : JsonConverter<FabricIconJson
         switch (reader.TokenType)
         {
             case JsonTokenType.String:
-                return (FabricIconJson)(reader.GetString() ?? "");
+                return reader.GetString() ?? "";
             case JsonTokenType.StartObject:
             {
                 var node = JsonNode.Parse(ref reader) as JsonObject;
@@ -172,7 +172,7 @@ internal sealed class TolerantFabricIconConverter : JsonConverter<FabricIconJson
                     }
                 }
 
-                return (FabricIconJson)sizes;
+                return sizes;
             }
             default:
                 return null;
@@ -192,9 +192,9 @@ internal sealed class TolerantFabricLicenseConverter : JsonConverter<FabricLicen
         switch (reader.TokenType)
         {
             case JsonTokenType.String:
-                return (FabricLicenseValue)(reader.GetString() ?? "");
+                return reader.GetString() ?? "";
             case JsonTokenType.StartObject:
-                return (FabricLicenseValue)ReadObject(ref reader);
+                return ReadObject(ref reader);
             case JsonTokenType.StartArray:
             {
                 var result = new List<FabricLicenseJson>();
@@ -202,16 +202,16 @@ internal sealed class TolerantFabricLicenseConverter : JsonConverter<FabricLicen
                 {
                     if (reader.TokenType == JsonTokenType.EndArray)
                     {
-                        return (FabricLicenseValue)result;
+                        return result;
                     }
 
                     if (reader.TokenType == JsonTokenType.String)
                     {
-                        result.Add((FabricLicenseJson)(reader.GetString() ?? ""));
+                        result.Add(reader.GetString() ?? "");
                     }
                     else if (reader.TokenType == JsonTokenType.StartObject)
                     {
-                        result.Add((FabricLicenseJson)ReadObject(ref reader));
+                        result.Add(ReadObject(ref reader));
                     }
                 }
 
@@ -261,19 +261,19 @@ internal sealed class TolerantFabricAuthorsConverter : JsonConverter<List<Fabric
             switch (reader.TokenType)
             {
                 case JsonTokenType.String:
-                    result.Add((FabricAuthorJson)(reader.GetString() ?? ""));
+                    result.Add(reader.GetString() ?? "");
                     break;
                 case JsonTokenType.StartObject:
                 {
                     var node = JsonNode.Parse(ref reader) as JsonObject;
-                    result.Add((FabricAuthorJson)new FabricAuthorObject
+                    result.Add(new FabricAuthorObject
                     {
                         Name = ModMetadataCoercion.String(node, "name"),
                     });
                     break;
                 }
                 default:
-                    result.Add((FabricAuthorJson)"");
+                    result.Add("");
                     break;
             }
         }
@@ -483,12 +483,12 @@ internal sealed class TolerantQuiltDependsConverter : JsonConverter<List<QuiltDe
 
             if (reader.TokenType == JsonTokenType.String)
             {
-                result.Add((QuiltDependJson)(reader.GetString() ?? ""));
+                result.Add(reader.GetString() ?? "");
             }
             else if (reader.TokenType == JsonTokenType.StartObject)
             {
                 var node = JsonNode.Parse(ref reader) as JsonObject;
-                result.Add((QuiltDependJson)new QuiltDependObject
+                result.Add(new QuiltDependObject
                 {
                     Id = ModMetadataCoercion.String(node, "id"),
                     Optional = node is not null && node.TryGetPropertyValue("optional", out var optional) &&
