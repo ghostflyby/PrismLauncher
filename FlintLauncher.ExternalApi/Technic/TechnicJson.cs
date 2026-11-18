@@ -27,6 +27,7 @@
 // like the C++ readers (a malformed document reads as nothing, never a failure); a Solder
 // build is strict, its failures surface with the "JSON response from Solder" wrapper.
 
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
@@ -49,6 +50,7 @@ public sealed record TechnicSearchListJson
 
 /// <summary>One trending/search entry; a null iconUrl carries the literal "null" sentinel
 /// (the caller maps it to the null-logo placeholder).</summary>
+[SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global")]
 public sealed record TechnicListEntryJson
 {
     public required string Name { get; init; }

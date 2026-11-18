@@ -127,7 +127,8 @@ public class MmcZipTests : IDisposable
         }
 
         using var merged = ZipFile.OpenRead(mergedPath);
-        Assert.Equal(["common.txt", "only1.txt"], merged.Entries.Select(e => e.FullName).OrderBy(n => n));
+        Assert.Equal(["common.txt", "only1.txt"],
+            merged.Entries.Select(e => e.FullName).OrderBy(n => n, StringComparer.Ordinal));
         // the first writer wins for duplicates
         using var reader = merged.Entries.First(e => e.FullName == "common.txt").Open();
         using var text = new StreamReader(reader);

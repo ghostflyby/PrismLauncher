@@ -31,6 +31,7 @@
 // required member is an error). Optional members stay nullable; Modpack.SafeName is a
 // computed property instead of a parsed field.
 
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
@@ -182,6 +183,7 @@ public sealed class FtbVersionFileCurseForge
 }
 
 /// <summary>Port of FTB::VersionFile.</summary>
+[SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global")]
 public sealed class FtbVersionFile
 {
     public required int Id { get; set; }

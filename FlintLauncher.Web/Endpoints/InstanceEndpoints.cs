@@ -3,6 +3,7 @@
 //
 // Instance endpoints: list/get/create-vanilla/import/delete/patch + instance settings.
 
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using FlintLauncher.Core.Config;
@@ -527,11 +528,17 @@ public static class InstanceEndpoints
             ? value.GetBoolean()
             : bool.TryParse(value.ToString(), out var b) && b,
         int => value.ValueKind == JsonValueKind.Number ? value.GetInt32()
-            : int.TryParse(value.ToString(), out var i) ? i : 0,
+            : int.TryParse(value.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var i)
+                ? i
+                : 0,
         long => value.ValueKind == JsonValueKind.Number ? value.GetInt64()
-            : long.TryParse(value.ToString(), out var l) ? l : 0L,
+            : long.TryParse(value.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var l)
+                ? l
+                : 0L,
         double => value.ValueKind == JsonValueKind.Number ? value.GetDouble()
-            : double.TryParse(value.ToString(), out var d) ? d : 0d,
+            : double.TryParse(value.ToString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var d)
+                ? d
+                : 0d,
         // typed string lists (linkedInstances): a JSON array of strings
         IReadOnlyList<string> => value.ValueKind == JsonValueKind.Array
             ? value.EnumerateArray()

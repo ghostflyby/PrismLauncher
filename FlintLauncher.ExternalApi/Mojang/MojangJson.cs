@@ -7,6 +7,7 @@
 // endpoints' exact PascalCase names, the Microsoft identity platform's snake_case and the
 // Minecraft services' camelCase.
 
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -247,6 +248,7 @@ public sealed record MojangProfile
 
 /// <summary>One skins entry of the profile answer; every member is optional (null when
 /// absent).</summary>
+[SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global")]
 public sealed record MojangSkinEntry
 {
     public string? Id { get; init; }
@@ -260,6 +262,7 @@ public sealed record MojangSkinEntry
 
 /// <summary>One capes entry of the profile answer, read like
 /// <see cref="MojangSkinEntry"/>.</summary>
+[SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global")]
 public sealed record MojangCapeEntry
 {
     public string? Id { get; init; }

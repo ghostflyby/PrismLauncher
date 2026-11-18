@@ -170,6 +170,7 @@ public class AccountDataTests
         var capes = profile.Capes;
         Assert.NotNull(capes);
         var cape = Assert.Single(capes);
+        Assert.NotNull(cape);
         Assert.Equal("cape-id", cape.Id);
         Assert.Equal("Migrator", cape.Alias);
 
@@ -194,7 +195,9 @@ public class AccountDataTests
         Assert.Equal("https://textures.minecraft.net/texture/skinhash", skin.Url);
         var capes = profile.Capes;
         Assert.NotNull(capes);
-        Assert.Equal("https://textures.minecraft.net/texture/capehash", Assert.Single(capes).Url);
+        var cape = Assert.Single(capes);
+        Assert.NotNull(cape);
+        Assert.Equal("https://textures.minecraft.net/texture/capehash", cape.Url);
     }
 
     [Fact]

@@ -10,7 +10,6 @@
 // the other API suites.
 
 using System.Net;
-using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using FlintLauncher.Core;
@@ -208,7 +207,8 @@ public class CoverageFixSettingsApiTests
 
         var profilers = view.GetProperty("profilers").EnumerateArray().ToList();
         Assert.Equal(["generic", "jprofiler", "jvisualvm"],
-            profilers.Select(p => p.GetProperty("key").GetString()).OrderBy(k => k));
+            profilers.Select(p => p.GetProperty("key").GetString())
+                .OrderBy(k => k, StringComparer.Ordinal));
 
         // the generic profiler takes no path, so it always passes its check; the two real ones
         // have no configured path in a fresh host and report why

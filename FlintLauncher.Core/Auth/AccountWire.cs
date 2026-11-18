@@ -89,7 +89,7 @@ public sealed record ProfileJson
     public string? Cape { get; init; }
 
     public required SkinJson Skin { get; init; }
-    public CapeJson[]? Capes { get; init; }
+    public CapeJson?[]? Capes { get; init; }
 }
 
 public sealed record SkinJson
