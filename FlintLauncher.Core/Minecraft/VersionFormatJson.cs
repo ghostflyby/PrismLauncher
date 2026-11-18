@@ -16,6 +16,7 @@
 // minimumLauncherVersion > 18 warns, the removed-feature members add problems, uid keeps
 // the fileId fallback and the regex check).
 
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using FlintLauncher.Core.Java;
@@ -24,6 +25,7 @@ using JdkFind;
 
 namespace FlintLauncher.Core.Minecraft;
 
+[SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global")]
 internal sealed record MojangDownloadInfoJson
 {
     public string? Path { get; init; }
@@ -35,6 +37,7 @@ internal sealed record MojangDownloadInfoJson
     public required int Size { get; init; }
 }
 
+[SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global")]
 internal sealed record MojangAssetIndexJson
 {
     public string? Path { get; init; }
@@ -96,6 +99,7 @@ internal sealed record LibraryJson
 }
 
 /// <summary>The DEPRECATED '+jarMods' entry shape.</summary>
+[SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global")]
 internal sealed record PlusJarModJson
 {
     public required string Name { get; init; }

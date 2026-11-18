@@ -15,6 +15,7 @@
 //  - `hashes` maps are keyed by arbitrary algorithm names; a digest value may be null;
 //  - the POST /version_files (update) responses are hash-keyed maps of versions.
 
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Serialization;
 
 namespace FlintLauncher.ExternalApi.Modrinth;
@@ -77,6 +78,7 @@ public sealed record ModrinthProject
 /// <summary>One search hit (the spec's ProjectResult) — a distinct type from the full
 /// project: `author` exists on search results only. Only the consumed members are modeled;
 /// the spec types `downloads` as a plain integer.</summary>
+[SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global")]
 public sealed record ModrinthSearchResult
 {
     public required string ProjectId { get; init; }
@@ -126,6 +128,7 @@ public sealed record ModrinthVersion
 
 /// <summary>The spec's VersionDependency: at most one of version_id/project_id is set;
 /// `dependency_type` is the only required member.</summary>
+[SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global")]
 public sealed record ModrinthDependency
 {
     public string? ProjectId { get; init; }

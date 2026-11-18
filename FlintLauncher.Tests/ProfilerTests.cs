@@ -56,7 +56,8 @@ public class ProfilerTests
     public void Registry_Has_The_Application_Keys()
     {
         // Application.cpp: m_profilers.insert("jprofiler"/"jvisualvm"/"generic", ...)
-        Assert.Equal(["generic", "jprofiler", "jvisualvm"], Profilers.All.Keys.OrderBy(k => k));
+        Assert.Equal(["generic", "jprofiler", "jvisualvm"],
+            Profilers.All.Keys.OrderBy(k => k, StringComparer.Ordinal));
         Assert.NotNull(Profilers.Value("jprofiler"));
         Assert.NotNull(Profilers.Value("jvisualvm"));
         Assert.NotNull(Profilers.Value("generic"));

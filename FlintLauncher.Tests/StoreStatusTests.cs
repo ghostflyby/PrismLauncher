@@ -7,7 +7,6 @@
 // GET /store/status/assets/{assetsId}) end-to-end through the real host.
 
 using System.Net;
-using System.Net.Http.Json;
 using System.Text.Json;
 using FlintLauncher.Core;
 using FlintLauncher.Core.Minecraft;

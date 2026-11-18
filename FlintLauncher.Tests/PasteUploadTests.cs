@@ -196,7 +196,7 @@ public class PasteUploadTests : IDisposable
         // expires = upload time + 100 days (Qt ISODate, UTC)
         var expiresText = root.GetProperty("expires").GetString();
         Assert.NotNull(expiresText);
-        var expires = DateTime.Parse(expiresText, null, DateTimeStyles.RoundtripKind);
+        var expires = DateTime.Parse(expiresText, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
         var delta = expires - DateTime.UtcNow;
         Assert.True(delta > TimeSpan.FromDays(99.9) && delta < TimeSpan.FromDays(100.1),
             "expires should be ~100 days out, got " + delta);

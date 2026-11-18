@@ -30,6 +30,7 @@
 // QJsonValue optional defaults (name "Unnamed", author "Anonymous", overrides "overrides",
 // required true, primary false).
 
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using TruePath;
@@ -54,6 +55,7 @@ internal sealed record FlameManifestJson
     public string? Overrides { get; init; }
 }
 
+[SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global")]
 internal sealed record FlameMinecraftJson
 {
     public required string Version { get; init; }
@@ -63,6 +65,7 @@ internal sealed record FlameMinecraftJson
     public int? RecommendedRam { get; init; }
 }
 
+[SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global")]
 internal sealed record FlameModloaderJson
 {
     public required string Id { get; init; }
@@ -70,6 +73,7 @@ internal sealed record FlameModloaderJson
     public bool? Primary { get; init; }
 }
 
+[SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global")]
 internal sealed record FlameFileJson
 {
     [JsonPropertyName("projectID")]

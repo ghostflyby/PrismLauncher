@@ -45,7 +45,7 @@ public sealed record MetaCacheFileJson
 {
     public required string Version { get; init; }
 
-    public required List<MetaCacheEntryJson> Entries { get; init; }
+    public required List<MetaCacheEntryJson?> Entries { get; init; }
 }
 
 public sealed record MetaCacheEntryJson
@@ -505,7 +505,7 @@ public sealed class HttpMetaCache(AbsolutePath path) : IDisposable
         MetaCacheFileJson entriesRoot;
         lock (_lock)
         {
-            var entriesArr = new List<MetaCacheEntryJson>();
+            var entriesArr = new List<MetaCacheEntryJson?>();
             foreach (var map in _entries.Values)
             {
                 foreach (var entry in map.Values)

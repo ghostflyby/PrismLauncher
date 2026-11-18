@@ -83,9 +83,11 @@ public class TaskWorkTests
             maxConcurrent: 2, TestContext.Current.CancellationToken));
 
         // A failing item neither stops nor cancels its siblings.
-        Assert.Equal(new[] { "ok", "unit 1", "unit 2" }, startOrder.OrderBy(name => name));
+        Assert.Equal(new[] { "ok", "unit 1", "unit 2" },
+            startOrder.OrderBy(name => name, StringComparer.Ordinal));
         Assert.Equal(new[] { "failure of unit 1", "failure of unit 2" },
-            ex.InnerExceptions.Select(failure => failure.Message).OrderBy(reason => reason).ToArray());
+            ex.InnerExceptions.Select(failure => failure.Message)
+                .OrderBy(reason => reason, StringComparer.Ordinal).ToArray());
     }
 
     [Fact]
@@ -121,7 +123,7 @@ public class TaskWorkTests
 
         // AggregateException.Message would render "One or more errors occurred. (…) (…)".
         Assert.Equal(new[] { "failure of unit 1", "failure of unit 2" },
-            TaskWork.ReasonOf(ex).Split('\n').OrderBy(reason => reason).ToArray());
+            TaskWork.ReasonOf(ex).Split('\n').OrderBy(reason => reason, StringComparer.Ordinal).ToArray());
         Assert.Equal("boom", TaskWork.ReasonOf(new InvalidOperationException("boom")));
     }
 

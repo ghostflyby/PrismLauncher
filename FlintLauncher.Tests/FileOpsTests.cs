@@ -131,7 +131,7 @@ public class FileOpsTests
         FileOps.Write(new AbsolutePath(path), new byte[] { 9 });
         Assert.Equal(new byte[] { 9 }, await File.ReadAllBytesAsync(path));
         Assert.Equal(["file.bin"], Directory.GetFiles(Path.Combine(tempDirScope.Path, "nested"))
-            .Select(Path.GetFileName).OrderBy(n => n));
+            .Select(Path.GetFileName).OrderBy(n => n, StringComparer.Ordinal));
     }
 
     [Fact]

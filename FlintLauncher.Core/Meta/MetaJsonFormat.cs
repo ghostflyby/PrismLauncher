@@ -32,6 +32,7 @@
 // stays node-based (shares the Require reads with OneSixVersionFormat, own batch); the
 // requires (de)serialization helpers are shared with PackProfile and stay node-based too.
 
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
@@ -96,6 +97,7 @@ internal sealed record MetaIndexJson
     public required List<MetaPackageJson?> Packages { get; init; }
 }
 
+[SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global")]
 internal sealed record MetaPackageJson
 {
     public required string Uid { get; init; }
